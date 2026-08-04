@@ -16,8 +16,14 @@ export default function AdminPage() {
   const [runKind, setRunKind] = useState<"news" | "market_data" | "full">("full");
   const [sources, setSources] = useState<string[]>(["merolagani", "sharesansar"]);
   const [executeNow, setExecuteNow] = useState(true);
+  const [newUserFullName, setNewUserFullName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState<"admin" | "analyst" | "viewer">("analyst");
+  const [newUserIsActive, setNewUserIsActive] = useState(true);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -80,6 +86,41 @@ export default function AdminPage() {
       setError(caughtError instanceof Error ? caughtError.message : "Unable to trigger crawl.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function createUser() {
+    if (!session) {
+      return;
+    }
+
+    setCreatingUser(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      await apiRequest("/admin/users", {
+        token: session.access_token,
+        method: "POST",
+        body: {
+          full_name: newUserFullName,
+          email: newUserEmail,
+          password: newUserPassword,
+          role: newUserRole,
+          is_active: newUserIsActive,
+        },
+      });
+      setSuccessMessage(`Created ${newUserRole} user ${newUserEmail}.`);
+      setNewUserFullName("");
+      setNewUserEmail("");
+      setNewUserPassword("");
+      setNewUserRole("analyst");
+      setNewUserIsActive(true);
+      await loadAdmin(session);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to create user.");
+    } finally {
+      setCreatingUser(false);
     }
   }
 
@@ -159,7 +200,65 @@ export default function AdminPage() {
               </div>
             </SectionCard>
 
-            <SectionCard title="Current Users">
+            <SectionCard title="Create User">
+              <div className="form">
+                <label className="field">
+                  <span>Full Name</span>
+                  <input
+                    value={newUserFullName}
+                    onChange={(event) => setNewUserFullName(event.target.value)}
+                    placeholder="Analyst User"
+                    type="text"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Email</span>
+                  <input
+                    value={newUserEmail}
+                    onChange={(event) => setNewUserEmail(event.target.value)}
+                    placeholder="analyst@example.com"
+                    type="email"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Password</span>
+                  <input
+                    value={newUserPassword}
+                    onChange={(event) => setNewUserPassword(event.target.value)}
+                    placeholder="analyst123"
+                    type="password"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Role</span>
+                  <select value={newUserRole} onChange={(event) => setNewUserRole(event.target.value as typeof newUserRole)}>
+                    <option value="analyst">Analyst</option>
+                    <option value="viewer">Viewer</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </label>
+
+                <label className="checkbox">
+                  <input checked={newUserIsActive} onChange={() => setNewUserIsActive((current) => !current)} type="checkbox" />
+                  <span>User is active</span>
+                </label>
+
+                <button
+                  className="button"
+                  disabled={creatingUser || !newUserFullName || !newUserEmail || !newUserPassword}
+                  onClick={createUser}
+                  type="button"
+                >
+                  {creatingUser ? "Creating..." : "Create User"}
+                </button>
+              </div>
+            </SectionCard>
+          </div>
+
+          <SectionCard title="Current Users">
               <div className="table-wrap">
                 <table className="table">
                   <thead>
@@ -182,8 +281,7 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
-            </SectionCard>
-          </div>
+          </SectionCard>
 
           <SectionCard title="Recent Crawl Runs">
             <div className="table-wrap">

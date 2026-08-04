@@ -3,14 +3,33 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db_session
 from app.core.permissions import RoleName, require_role
+from app.core.security import get_password_hash
 from app.models.user import User
 from app.repositories.admin_repository import create_crawl_run, get_crawl_run_by_id, list_crawl_runs
-from app.repositories.user_repository import list_users
-from app.schemas.admin import CrawlRunListResponse, CrawlRunRequest, CrawlRunResponse, UserListResponse, UserSummaryResponse
+from app.repositories.user_repository import get_role_by_name, get_user_by_email, list_users
+from app.schemas.admin import (
+    CrawlRunListResponse,
+    CrawlRunRequest,
+    CrawlRunResponse,
+    UserCreateRequest,
+    UserListResponse,
+    UserSummaryResponse,
+)
 from app.services.crawl_service import execute_crawl_run
 from app.tasks.crawl_tasks import run_crawl_pipeline
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _serialize_user(user: User) -> UserSummaryResponse:
+    return UserSummaryResponse(
+        id=user.id,
+        full_name=user.full_name,
+        email=user.email,
+        is_active=user.is_active,
+        role=user.role.name,
+        last_login_at=user.last_login_at,
+    )
 
 
 @router.post("/crawl-runs", response_model=CrawlRunResponse)
@@ -109,16 +128,33 @@ async def list_users_endpoint(
     _: User = Depends(require_role(RoleName.ADMIN)),
 ) -> UserListResponse:
     users = list_users(db)
-    return UserListResponse(
-        items=[
-            UserSummaryResponse(
-                id=user.id,
-                full_name=user.full_name,
-                email=user.email,
-                is_active=user.is_active,
-                role=user.role.name,
-                last_login_at=user.last_login_at,
-            )
-            for user in users
-        ]
+    return UserListResponse(items=[_serialize_user(user) for user in users])
+
+
+@router.post("/users", response_model=UserSummaryResponse, status_code=status.HTTP_201_CREATED)
+async def create_user_endpoint(
+    payload: UserCreateRequest,
+    db: Session = Depends(get_db_session),
+    _: User = Depends(require_role(RoleName.ADMIN)),
+) -> UserSummaryResponse:
+    existing_user = get_user_by_email(db, payload.email)
+    if existing_user is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A user with this email already exists.")
+
+    role = get_role_by_name(db, payload.role)
+    if role is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requested role was not found.")
+
+    user = User(
+        full_name=payload.full_name.strip(),
+        email=payload.email.strip().lower(),
+        password_hash=get_password_hash(payload.password),
+        role_id=role.id,
+        is_active=payload.is_active,
     )
+    db.add(user)
+    db.commit()
+    created_user = get_user_by_email(db, user.email)
+    if created_user is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User creation failed.")
+    return _serialize_user(created_user)
