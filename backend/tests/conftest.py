@@ -77,6 +77,22 @@ def viewer_user(db_session):
 
 
 @pytest.fixture()
+def analyst_user(db_session):
+    analyst_role = db_session.scalar(select(Role).where(Role.name == "analyst"))
+    analyst = User(
+        full_name="Analyst User",
+        email="analyst@example.com",
+        password_hash=get_password_hash("analyst123"),
+        role_id=analyst_role.id,
+        is_active=True,
+    )
+    db_session.add(analyst)
+    db_session.commit()
+    db_session.refresh(analyst)
+    return analyst
+
+
+@pytest.fixture()
 def seeded_company_data(db_session):
     company = Company(
         symbol="NABIL",

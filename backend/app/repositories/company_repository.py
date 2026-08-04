@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.analysis_snapshot import CompanyAnalysisSnapshot
@@ -16,8 +16,18 @@ def list_active_companies(db: Session) -> list[Company]:
     return list(db.scalars(statement).all())
 
 
+def list_companies(db: Session) -> list[Company]:
+    statement = select(Company).order_by(Company.symbol.asc())
+    return list(db.scalars(statement).all())
+
+
 def get_company_by_id(db: Session, company_id: int) -> Optional[Company]:
     return db.get(Company, company_id)
+
+
+def get_company_by_symbol(db: Session, symbol: str) -> Optional[Company]:
+    statement = select(Company).where(func.lower(Company.symbol) == symbol.strip().lower())
+    return db.scalar(statement)
 
 
 def list_company_prices(db: Session, company_id: int, limit: int) -> list[DailyPrice]:

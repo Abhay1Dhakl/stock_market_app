@@ -7,12 +7,22 @@ import { LayoutShell } from "@/components/layout-shell";
 import { SectionCard } from "@/components/section-card";
 import { apiRequest } from "@/lib/api";
 import { loadSession } from "@/lib/auth";
-import type { CrawlRunListResponse, CrawlRunResponse, TokenResponse, UserListResponse } from "@/types";
+import type {
+  CompanyCreateRequest,
+  CompanyListResponse,
+  CompanySummary,
+  CompanyUpdateRequest,
+  CrawlRunListResponse,
+  CrawlRunResponse,
+  TokenResponse,
+  UserListResponse,
+} from "@/types";
 
 export default function AdminPage() {
   const [session, setSession] = useState<TokenResponse | null>(null);
   const [crawlRuns, setCrawlRuns] = useState<CrawlRunResponse[]>([]);
   const [users, setUsers] = useState<UserListResponse["items"]>([]);
+  const [companies, setCompanies] = useState<CompanySummary[]>([]);
   const [runKind, setRunKind] = useState<"news" | "market_data" | "full">("full");
   const [sources, setSources] = useState<string[]>(["merolagani", "sharesansar"]);
   const [executeNow, setExecuteNow] = useState(true);
@@ -21,9 +31,17 @@ export default function AdminPage() {
   const [newUserPassword, setNewUserPassword] = useState("");
   const [newUserRole, setNewUserRole] = useState<"admin" | "analyst" | "viewer">("analyst");
   const [newUserIsActive, setNewUserIsActive] = useState(true);
+  const [newCompanySymbol, setNewCompanySymbol] = useState("");
+  const [newCompanyName, setNewCompanyName] = useState("");
+  const [newCompanySector, setNewCompanySector] = useState("");
+  const [newCompanyAliases, setNewCompanyAliases] = useState("");
+  const [newCompanyDescription, setNewCompanyDescription] = useState("");
+  const [newCompanyIsActive, setNewCompanyIsActive] = useState(true);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
+  const [creatingCompany, setCreatingCompany] = useState(false);
+  const [updatingCompanyId, setUpdatingCompanyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -42,16 +60,20 @@ export default function AdminPage() {
     setError(null);
 
     try {
-      const [crawlRunResponse, userResponse] = await Promise.all([
+      const [crawlRunResponse, userResponse, companyResponse] = await Promise.all([
         apiRequest<CrawlRunListResponse>("/admin/crawl-runs?limit=10", {
           token: activeSession.access_token,
         }),
         apiRequest<UserListResponse>("/admin/users", {
           token: activeSession.access_token,
         }),
+        apiRequest<CompanyListResponse>("/admin/companies", {
+          token: activeSession.access_token,
+        }),
       ]);
       setCrawlRuns(crawlRunResponse.items);
       setUsers(userResponse.items);
+      setCompanies(companyResponse.items);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Unable to load admin console.");
     } finally {
@@ -124,6 +146,71 @@ export default function AdminPage() {
     }
   }
 
+  async function createCompany() {
+    if (!session) {
+      return;
+    }
+
+    setCreatingCompany(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const payload: CompanyCreateRequest = {
+        symbol: newCompanySymbol,
+        name: newCompanyName,
+        sector: newCompanySector,
+        aliases: parseAliases(newCompanyAliases),
+        description: newCompanyDescription.trim() || null,
+        is_active: newCompanyIsActive,
+      };
+      await apiRequest("/admin/companies", {
+        token: session.access_token,
+        method: "POST",
+        body: payload,
+      });
+      setSuccessMessage(`Added ${newCompanySymbol.toUpperCase()} to the watchlist.`);
+      setNewCompanySymbol("");
+      setNewCompanyName("");
+      setNewCompanySector("");
+      setNewCompanyAliases("");
+      setNewCompanyDescription("");
+      setNewCompanyIsActive(true);
+      await loadAdmin(session);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to create company.");
+    } finally {
+      setCreatingCompany(false);
+    }
+  }
+
+  async function toggleCompanyStatus(company: CompanySummary) {
+    if (!session) {
+      return;
+    }
+
+    setUpdatingCompanyId(company.id);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const payload: CompanyUpdateRequest = {
+        is_active: !company.is_active,
+      };
+      await apiRequest(`/admin/companies/${company.id}`, {
+        token: session.access_token,
+        method: "PATCH",
+        body: payload,
+      });
+      setSuccessMessage(`${company.symbol} is now ${company.is_active ? "inactive" : "active"}.`);
+      await loadAdmin(session);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to update company.");
+    } finally {
+      setUpdatingCompanyId(null);
+    }
+  }
+
   if (!session) {
     return (
       <LayoutShell
@@ -142,6 +229,7 @@ export default function AdminPage() {
 
   const activeUsers = users.filter((user) => user.is_active).length;
   const succeededRuns = crawlRuns.filter((run) => run.status === "succeeded").length;
+  const activeCompanies = companies.filter((company) => company.is_active).length;
 
   return (
     <LayoutShell
@@ -181,9 +269,9 @@ export default function AdminPage() {
               <div className="kpi__note">The latest crawl executions loaded from the protected admin API.</div>
             </div>
             <div className="kpi">
-              <div className="kpi__label">Succeeded Runs</div>
-              <div className="kpi__value">{succeededRuns}</div>
-              <div className="kpi__note">Successful runs confirm that crawling, tagging, and analysis completed without failure.</div>
+              <div className="kpi__label">Active Watchlist</div>
+              <div className="kpi__value">{activeCompanies}</div>
+              <div className="kpi__note">Tracked companies currently active for crawling, categorization, and analysis.</div>
             </div>
           </div>
 
@@ -341,8 +429,125 @@ export default function AdminPage() {
               </div>
             </SectionCard>
           </div>
+
+          <div className="grid grid--two">
+            <SectionCard eyebrow="Watchlist" title="Add Tracked Company" aside={<span className="badge">{activeCompanies} active</span>}>
+              <div className="form">
+                <label className="field">
+                  <span>Symbol</span>
+                  <input
+                    value={newCompanySymbol}
+                    onChange={(event) => setNewCompanySymbol(event.target.value.toUpperCase())}
+                    placeholder="NICA"
+                    type="text"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Company Name</span>
+                  <input
+                    value={newCompanyName}
+                    onChange={(event) => setNewCompanyName(event.target.value)}
+                    placeholder="NIC Asia Bank Limited"
+                    type="text"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Sector</span>
+                  <input
+                    value={newCompanySector}
+                    onChange={(event) => setNewCompanySector(event.target.value)}
+                    placeholder="Banking"
+                    type="text"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Aliases</span>
+                  <input
+                    value={newCompanyAliases}
+                    onChange={(event) => setNewCompanyAliases(event.target.value)}
+                    placeholder="NIC Asia, NICA"
+                    type="text"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Description</span>
+                  <textarea
+                    rows={3}
+                    value={newCompanyDescription}
+                    onChange={(event) => setNewCompanyDescription(event.target.value)}
+                    placeholder="Short reason for tracking this company."
+                  />
+                </label>
+
+                <label className="checkbox">
+                  <input checked={newCompanyIsActive} onChange={() => setNewCompanyIsActive((current) => !current)} type="checkbox" />
+                  <span>Track this company immediately</span>
+                </label>
+
+                <button
+                  className="button"
+                  disabled={creatingCompany || !newCompanySymbol || !newCompanyName || !newCompanySector}
+                  onClick={createCompany}
+                  type="button"
+                >
+                  {creatingCompany ? "Adding..." : "Add Company"}
+                </button>
+              </div>
+            </SectionCard>
+
+            <SectionCard eyebrow="Watchlist" title="Current Coverage" aside={<span className="badge">{companies.length} total</span>}>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Symbol</th>
+                      <th>Name</th>
+                      <th>Sector</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {companies.map((company) => (
+                      <tr key={company.id}>
+                        <td>{company.symbol}</td>
+                        <td>{company.name}</td>
+                        <td>{company.sector}</td>
+                        <td>{company.is_active ? "Active" : "Inactive"}</td>
+                        <td>
+                          <button
+                            className="button button--ghost"
+                            disabled={updatingCompanyId === company.id}
+                            onClick={() => toggleCompanyStatus(company)}
+                            type="button"
+                          >
+                            {updatingCompanyId === company.id
+                              ? "Updating..."
+                              : company.is_active
+                                ? "Deactivate"
+                                : "Activate"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </SectionCard>
+          </div>
         </>
       )}
     </LayoutShell>
   );
+}
+
+function parseAliases(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }

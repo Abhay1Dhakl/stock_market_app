@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CompanySummary(BaseModel):
@@ -24,6 +24,23 @@ class CompanySummary(BaseModel):
 
 class CompanyListResponse(BaseModel):
     items: list[CompanySummary]
+
+
+class CompanyCreateRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=25)
+    name: str = Field(min_length=2, max_length=255)
+    sector: str = Field(min_length=2, max_length=100)
+    aliases: list[str] = Field(default_factory=list)
+    description: Optional[str] = None
+    is_active: bool = True
+
+
+class CompanyUpdateRequest(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=2, max_length=255)
+    sector: Optional[str] = Field(default=None, min_length=2, max_length=100)
+    aliases: Optional[list[str]] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 class DailyPriceResponse(BaseModel):

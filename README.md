@@ -32,6 +32,8 @@ Because the assignment is time-boxed, the categorization pipeline now supports a
 - Gemini 2.5 Flash based categorization via structured JSON output when configured
 - Deterministic rule-based fallback categorization when Gemini is unavailable or disabled
 - Manual analyst/admin recategorization with correction history
+- Admin watchlist management for adding companies and activating/deactivating coverage
+- CSV watchlist-summary report export for dashboard and analyst workflows
 - Derived behavior-analysis snapshots:
   - VWAP
   - daily price change percentage
@@ -65,7 +67,7 @@ Because the assignment is time-boxed, the categorization pipeline now supports a
 
 ## Seeded Watchlist
 
-The current watchlist is seeded from [data/seed/companies.json](data/seed/companies.json) and contains six companies across multiple sectors:
+The watchlist is bootstrapped from [data/seed/companies.json](data/seed/companies.json) and currently contains six companies across multiple sectors:
 
 - `NABIL`
 - `NTC`
@@ -74,7 +76,7 @@ The current watchlist is seeded from [data/seed/companies.json](data/seed/compan
 - `SICL`
 - `CHCL`
 
-The assignment requested 5-10 companies. This repository currently uses 6 companies, which stays inside that range.
+The assignment requested 5-10 companies. This repository currently uses 6 companies, which stays inside that range. After bootstrap, the watchlist can be managed from the admin API and admin UI.
 
 ## Categorization Approach
 
@@ -189,8 +191,12 @@ Implemented primary endpoints include:
 - `POST /api/admin/crawl-runs`
 - `GET /api/admin/crawl-runs`
 - `GET /api/admin/crawl-runs/:id`
+- `GET /api/admin/companies`
+- `POST /api/admin/companies`
+- `PATCH /api/admin/companies/:id`
 - `GET /api/admin/users`
 - `POST /api/admin/users`
+- `GET /api/reports/watchlist-summary.csv`
 
 OpenAPI is available at:
 
@@ -237,33 +243,41 @@ These can be overridden with `BOOTSTRAP_ADMIN_*` values in `.env`.
 1. Sign in from `/login`.
 2. Open `/admin`.
 3. Trigger a `full` crawl with inline execution enabled.
-4. Open `/dashboard`.
-5. Open any company board from the watchlist.
-6. Inspect:
+4. Add or deactivate a tracked company from the watchlist section if you want to demonstrate admin watchlist management.
+5. Open `/dashboard` and export the CSV summary report.
+6. Open any company board from the watchlist.
+7. Inspect:
    - 30 day trend chart
    - recent tagged news
    - behavior summary
    - buyer/seller analysis
-7. Open `/review` and manually correct a low-confidence article.
+8. Open `/review` and manually correct a low-confidence article.
 
 ## Verification Completed
 
 Verified on **August 4, 2026**:
 
-- backend tests: `18 passed`
+- backend tests: `22 passed`
 - frontend production build: `docker compose run --rm --no-deps frontend npm run build`
+- live API smoke:
+  - `POST /api/auth/login`
+  - `GET /api/admin/companies`
+  - `GET /api/reports/watchlist-summary.csv`
 - live crawl verification:
   - `6` companies seeded
   - `180` daily price rows created
   - `24` news articles stored
   - `1` auto-tagged article
   - `23` review-queue candidates
+- GitHub Actions CI:
+  - backend test suite on push/pull request
+  - frontend production build on push/pull request
 
 ## Time-Boxed Assumptions And Shortcuts
 
-- Categorization is rule-based rather than embedding-based or LLM-based.
-- The tracked watchlist is seeded from JSON rather than fully admin-managed through CRUD screens.
-- Analyst export/report download endpoints are not implemented yet.
+- The categorization path is Gemini-first with a deterministic fallback matcher rather than a custom trained finance classifier.
+- The watchlist is seeded from JSON for bootstrap speed, then managed through the admin surface.
+- Report export is provided as a CSV summary rather than a styled PDF report pack.
 - Broker analysis depends on live floorsheet availability from the source site. The code path exists, tests cover it, and the UI supports it, but some live runs may return zero floorsheet rows.
 - Local `docker compose` execution is the primary delivery path. No public deployment URL is included in this repository.
 

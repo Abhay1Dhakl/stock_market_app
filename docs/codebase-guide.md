@@ -23,7 +23,7 @@ This project becomes easy to understand once you read it as **one pipeline** ins
    - store those outputs in `company_analysis_snapshots`
 
 5. **Expose APIs**
-   - prices, floorsheet, news, analysis, review queue, and admin operations
+   - prices, floorsheet, news, analysis, review queue, report export, and admin operations
 
 6. **Render the UI**
    - dashboard for cross-company monitoring
@@ -86,6 +86,7 @@ These files expose the services over HTTP:
 - news and review queue: [`backend/app/api/news.py`](../backend/app/api/news.py)
 - behavior analysis: [`backend/app/api/analysis.py`](../backend/app/api/analysis.py)
 - admin flows: [`backend/app/api/admin.py`](../backend/app/api/admin.py)
+- report export: [`backend/app/api/reports.py`](../backend/app/api/reports.py)
 
 ### 3. Read Cross-Cutting Backend Files
 
@@ -131,7 +132,7 @@ This is the human correction loop for weak categorization results.
 
 [`frontend/app/admin/page.tsx`](../frontend/app/admin/page.tsx)
 
-This is where crawl runs are triggered and users are created.
+This is where crawl runs are triggered, users are created, and the tracked company watchlist is managed.
 
 ## Fastest Way To Understand It End To End
 

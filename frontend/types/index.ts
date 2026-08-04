@@ -30,6 +30,23 @@ export type CompanyListResponse = {
   items: CompanySummary[];
 };
 
+export type CompanyCreateRequest = {
+  symbol: string;
+  name: string;
+  sector: string;
+  aliases: string[];
+  description: string | null;
+  is_active: boolean;
+};
+
+export type CompanyUpdateRequest = {
+  name?: string;
+  sector?: string;
+  aliases?: string[];
+  description?: string | null;
+  is_active?: boolean;
+};
+
 export type DailyPrice = {
   trading_date: string;
   open_price: string;

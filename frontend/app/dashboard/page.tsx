@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { LayoutShell } from "@/components/layout-shell";
 import { SectionCard } from "@/components/section-card";
-import { apiRequest } from "@/lib/api";
+import { API_BASE_URL, apiRequest } from "@/lib/api";
 import { clearSession, loadSession } from "@/lib/auth";
 import type {
   BehaviorSummary,
@@ -27,6 +27,7 @@ export default function DashboardPage() {
   const [newsItems, setNewsItems] = useState<NewsArticleSummary[]>([]);
   const [reviewQueueCount, setReviewQueueCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloadingReport, setDownloadingReport] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -88,6 +89,41 @@ export default function DashboardPage() {
     setReviewQueueCount(null);
   }
 
+  async function downloadWatchlistReport() {
+    if (!session) {
+      return;
+    }
+
+    setDownloadingReport(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/reports/watchlist-summary.csv`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error(`Unable to export report (${response.status}).`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "watchlist-summary.csv";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to export report.");
+    } finally {
+      setDownloadingReport(false);
+    }
+  }
+
   if (!session) {
     return (
       <LayoutShell
@@ -123,12 +159,15 @@ export default function DashboardPage() {
       description="Compare the tracked NEPSE watchlist across closing price, VWAP, tagged news volume, pressure signals, and anomaly flags."
     >
       <div className="toolbar">
-        <div className="badge">
-          Signed in as {session.user.full_name} ({session.user.role})
+        <div className="badge">Signed in as {session.user.full_name} ({session.user.role})</div>
+        <div className="tag-row">
+          <button className="button button--ghost" disabled={downloadingReport} onClick={downloadWatchlistReport} type="button">
+            {downloadingReport ? "Exporting..." : "Export CSV"}
+          </button>
+          <button className="button button--ghost" onClick={handleLogout} type="button">
+            Log Out
+          </button>
         </div>
-        <button className="button button--ghost" onClick={handleLogout} type="button">
-          Log Out
-        </button>
       </div>
 
       {loading ? (
