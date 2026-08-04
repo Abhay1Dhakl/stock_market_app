@@ -109,10 +109,12 @@ export default function ReviewPage() {
     );
   }
 
+  const suggestedLinks = Object.values(selectedCompanyIds).reduce((total, companyIds) => total + companyIds.length, 0);
+
   return (
     <LayoutShell
-      title="Review Queue"
-      description="Analyst workspace for low-confidence or uncategorized articles. Manual corrections are preserved over future system tagging."
+      title="Manual Review Desk"
+      description="Analyst workspace for low-confidence or uncategorized articles where human corrections override future automated tagging."
     >
       {loading ? (
         <SectionCard title="Loading">
@@ -125,19 +127,43 @@ export default function ReviewPage() {
       ) : (
         <>
           {successMessage ? (
-            <SectionCard title="Updated">
+            <SectionCard eyebrow="Review" title="Updated">
               <p>{successMessage}</p>
             </SectionCard>
           ) : null}
 
           {articles.length === 0 ? (
-            <SectionCard title="Queue Empty">
+            <SectionCard eyebrow="Queue" title="Queue Empty">
               <p>No low-confidence or uncategorized news items currently need analyst review.</p>
             </SectionCard>
           ) : (
-            <div className="stack">
+            <>
+              <div className="kpi-strip">
+                <div className="kpi">
+                  <div className="kpi__label">Articles In Queue</div>
+                  <div className="kpi__value">{articles.length}</div>
+                  <div className="kpi__note">Low-confidence or uncategorized headlines that still need an analyst decision.</div>
+                </div>
+                <div className="kpi">
+                  <div className="kpi__label">Suggested Links</div>
+                  <div className="kpi__value">{suggestedLinks}</div>
+                  <div className="kpi__note">Current company selections across all queued articles before any manual changes.</div>
+                </div>
+                <div className="kpi">
+                  <div className="kpi__label">Workspace Role</div>
+                  <div className="kpi__value">{session.user.role}</div>
+                  <div className="kpi__note">Only analysts and admins should operate from this manual review surface.</div>
+                </div>
+              </div>
+
+              <div className="stack">
               {articles.map((article) => (
-                <SectionCard key={article.id} title={article.headline}>
+                <SectionCard
+                  key={article.id}
+                  eyebrow={article.source_name}
+                  title={article.headline}
+                  aside={<span className="badge">{article.tags.length ? `${article.tags.length} tags` : "untagged"}</span>}
+                >
                   <div className="list-card__meta">
                     <span>{article.source_name}</span>
                     <span>{formatDate(article.published_at)}</span>
@@ -190,7 +216,8 @@ export default function ReviewPage() {
                   </button>
                 </SectionCard>
               ))}
-            </div>
+              </div>
+            </>
           )}
         </>
       )}

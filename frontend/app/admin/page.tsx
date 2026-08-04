@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { LayoutShell } from "@/components/layout-shell";
 import { SectionCard } from "@/components/section-card";
@@ -127,10 +127,10 @@ export default function AdminPage() {
   if (!session) {
     return (
       <LayoutShell
-        title="Admin Console"
-        description="Admin access is required before this page can manage crawl runs and user-role metadata."
+        title="Ops Console"
+        description="Admin access is required before this page can manage crawl runs, user creation, and operational metadata."
       >
-        <SectionCard title="Session Required">
+        <SectionCard eyebrow="Access" title="Session Required">
           <p>Login as the admin user and return here.</p>
           <Link className="button" href="/login">
             Go to Login
@@ -140,29 +140,55 @@ export default function AdminPage() {
     );
   }
 
+  const activeUsers = users.filter((user) => user.is_active).length;
+  const completedRuns = crawlRuns.filter((run) => run.status === "completed").length;
+
   return (
     <LayoutShell
-      title="Admin Console"
-      description="Trigger crawl runs, inspect pipeline output, and audit the current role-based users loaded by the backend."
+      title="Operations Console"
+      description="Admin workspace for crawl execution, role provisioning, and quick inspection of the pipeline state exposed by the backend."
     >
       {loading ? (
-        <SectionCard title="Loading">
+        <SectionCard eyebrow="Status" title="Loading">
           <p>Fetching crawl history and users.</p>
         </SectionCard>
       ) : error ? (
-        <SectionCard title="Error">
+        <SectionCard eyebrow="Status" title="Error">
           <p>{error}</p>
         </SectionCard>
       ) : (
         <>
           {successMessage ? (
-            <SectionCard title="Success">
+            <SectionCard eyebrow="Status" title="Success">
               <p>{successMessage}</p>
             </SectionCard>
           ) : null}
 
+          <div className="kpi-strip">
+            <div className="kpi">
+              <div className="kpi__label">Known Users</div>
+              <div className="kpi__value">{users.length}</div>
+              <div className="kpi__note">Accounts provisioned through bootstrap and the in-app admin user creator.</div>
+            </div>
+            <div className="kpi">
+              <div className="kpi__label">Active Users</div>
+              <div className="kpi__value">{activeUsers}</div>
+              <div className="kpi__note">Users currently flagged as active and allowed to authenticate.</div>
+            </div>
+            <div className="kpi">
+              <div className="kpi__label">Recent Runs</div>
+              <div className="kpi__value">{crawlRuns.length}</div>
+              <div className="kpi__note">The latest crawl executions loaded from the protected admin API.</div>
+            </div>
+            <div className="kpi">
+              <div className="kpi__label">Completed Runs</div>
+              <div className="kpi__value">{completedRuns}</div>
+              <div className="kpi__note">Finished runs let you confirm whether the ingestion and analysis loop is healthy.</div>
+            </div>
+          </div>
+
           <div className="grid grid--two">
-            <SectionCard title="Trigger Crawl">
+            <SectionCard eyebrow="Crawlers" title="Trigger Crawl" aside={<span className="badge">{runKind}</span>}>
               <div className="form">
                 <label className="field">
                   <span>Run Kind</span>
@@ -200,7 +226,7 @@ export default function AdminPage() {
               </div>
             </SectionCard>
 
-            <SectionCard title="Create User">
+            <SectionCard eyebrow="Users" title="Create User" aside={<span className="badge">{newUserRole}</span>}>
               <div className="form">
                 <label className="field">
                   <span>Full Name</span>
@@ -258,7 +284,8 @@ export default function AdminPage() {
             </SectionCard>
           </div>
 
-          <SectionCard title="Current Users">
+          <div className="grid grid--two">
+            <SectionCard eyebrow="Directory" title="Current Users" aside={<span className="badge">{users.length} total</span>}>
               <div className="table-wrap">
                 <table className="table">
                   <thead>
@@ -281,38 +308,39 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
-          </SectionCard>
+            </SectionCard>
 
-          <SectionCard title="Recent Crawl Runs">
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Status</th>
-                    <th>Kind</th>
-                    <th>Requested By</th>
-                    <th>Finished</th>
-                    <th>Stats</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {crawlRuns.map((crawlRun) => (
-                    <tr key={crawlRun.id}>
-                      <td>{crawlRun.id}</td>
-                      <td>{crawlRun.status}</td>
-                      <td>{crawlRun.run_kind}</td>
-                      <td>{crawlRun.requested_by ?? "system"}</td>
-                      <td>{crawlRun.finished_at ? new Date(crawlRun.finished_at).toLocaleString() : "Pending"}</td>
-                      <td>
-                        <pre className="json-block">{JSON.stringify(crawlRun.run_stats, null, 2)}</pre>
-                      </td>
+            <SectionCard eyebrow="Runs" title="Recent Crawl Runs" aside={<span className="badge">{crawlRuns.length} loaded</span>}>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Status</th>
+                      <th>Kind</th>
+                      <th>Requested By</th>
+                      <th>Finished</th>
+                      <th>Stats</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </SectionCard>
+                  </thead>
+                  <tbody>
+                    {crawlRuns.map((crawlRun) => (
+                      <tr key={crawlRun.id}>
+                        <td>{crawlRun.id}</td>
+                        <td>{crawlRun.status}</td>
+                        <td>{crawlRun.run_kind}</td>
+                        <td>{crawlRun.requested_by ?? "system"}</td>
+                        <td>{crawlRun.finished_at ? new Date(crawlRun.finished_at).toLocaleString() : "Pending"}</td>
+                        <td>
+                          <pre className="json-block">{JSON.stringify(crawlRun.run_stats, null, 2)}</pre>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </SectionCard>
+          </div>
         </>
       )}
     </LayoutShell>

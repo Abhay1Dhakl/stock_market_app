@@ -104,10 +104,15 @@ export default function DashboardPage() {
     );
   }
 
+  const anomalyCount = cards.filter(({ summary }) => summary.is_volume_anomaly).length;
+  const totalTaggedNews = cards.reduce((total, { summary }) => total + summary.news_count, 0);
+  const focusCompany = [...cards].sort((left, right) => right.summary.news_count - left.summary.news_count)[0] ?? null;
+  const pressureSignals = cards.filter(({ summary }) => summary.pressure_indicator).length;
+
   return (
     <LayoutShell
-      title="Cross-Company Dashboard"
-      description="Live dashboard across the seeded NEPSE watchlist using crawled news, market data, categorization, and analysis snapshots."
+      title="Cross-Company Watchlist"
+      description="Dense market workspace for scanning the seeded NEPSE watchlist across price pressure, tagged headlines, anomalies, and review workload."
     >
       <div className="toolbar">
         <div className="badge">
@@ -128,13 +133,49 @@ export default function DashboardPage() {
         </SectionCard>
       ) : (
         <>
+          <div className="kpi-strip">
+            <div className="kpi">
+              <div className="kpi__label">Tracked Companies</div>
+              <div className="kpi__value">{cards.length}</div>
+              <div className="kpi__note">All seeded watchlist companies currently available in the protected dashboard.</div>
+            </div>
+            <div className="kpi">
+              <div className="kpi__label">Tagged News</div>
+              <div className="kpi__value">{totalTaggedNews}</div>
+              <div className="kpi__note">Aggregate article references mapped across the latest company snapshots.</div>
+            </div>
+            <div className="kpi">
+              <div className="kpi__label">Volume Flags</div>
+              <div className="kpi__value">{anomalyCount}</div>
+              <div className="kpi__note">Companies currently marked with a detected volume anomaly in the snapshot.</div>
+            </div>
+            <div className="kpi">
+              <div className="kpi__label">Focus Name</div>
+              <div className="kpi__value">{focusCompany?.company.symbol ?? "N/A"}</div>
+              <div className="kpi__note">
+                {focusCompany
+                  ? `${focusCompany.summary.news_count} tagged stories make ${focusCompany.company.name} the current headline focus.`
+                  : "Run a crawl to populate the watchlist and recent news focus."}
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid--three">
             {cards.map(({ company, summary }) => (
-              <SectionCard key={company.id} title={`${company.symbol} · ${company.sector}`}>
+              <SectionCard
+                key={company.id}
+                eyebrow="Watchlist"
+                title={`${company.symbol} · ${company.sector}`}
+                aside={<span className="badge">{summary.news_count} news</span>}
+              >
                 <div className="metric">
                   {summary.close_price ? `Rs. ${summary.close_price}` : "No close price"}
                 </div>
                 <p className="muted">{company.name}</p>
+                <div className="stat-row">
+                  <span>VWAP</span>
+                  <strong>{summary.vwap ?? "pending"}</strong>
+                </div>
                 <div className="stat-row">
                   <span>Pressure</span>
                   <strong>{summary.pressure_indicator ?? "pending"}</strong>
@@ -148,14 +189,14 @@ export default function DashboardPage() {
                   <strong>{summary.is_volume_anomaly ? "Yes" : "No"}</strong>
                 </div>
                 <Link className="button" href={`/companies/${company.id}`}>
-                  Open Company View
+                  Open Company Board
                 </Link>
               </SectionCard>
             ))}
           </div>
 
           <div className="grid grid--two">
-            <SectionCard title="Recent Tagged News">
+            <SectionCard eyebrow="Feed" title="Recent Tagged News" aside={<span className="badge">{newsItems.length} items</span>}>
               {newsItems.length === 0 ? (
                 <p>No crawled news is stored yet. Trigger a crawl from the admin page.</p>
               ) : (
@@ -181,7 +222,7 @@ export default function DashboardPage() {
               )}
             </SectionCard>
 
-            <SectionCard title="Operational Summary">
+            <SectionCard eyebrow="Status" title="Operational Summary" aside={<span className="badge">{pressureSignals} signals</span>}>
               <div className="stat-row">
                 <span>Tracked Companies</span>
                 <strong>{cards.length}</strong>
@@ -196,9 +237,13 @@ export default function DashboardPage() {
                   <strong>{reviewQueueCount}</strong>
                 </div>
               ) : null}
+              <div className="stat-row">
+                <span>Pressure Signals</span>
+                <strong>{pressureSignals}</strong>
+              </div>
               <p className="muted">
-                Use the review page for low-confidence tags and the admin page to run full crawls inline or through
-                Celery.
+                Use the review desk for low-confidence tags and the ops console to trigger fresh crawls inline or
+                through Celery.
               </p>
             </SectionCard>
           </div>

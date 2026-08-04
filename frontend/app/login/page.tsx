@@ -44,11 +44,11 @@ export default function LoginPage() {
 
   return (
     <LayoutShell
-      title="Login"
-      description="Use the backend JWT endpoint to create a browser session for the protected dashboard, review, and admin pages."
+      title="Operator Access"
+      description="Use the backend JWT endpoint to unlock the watchlist, review desk, and ops console from a single browser session."
     >
       <div className="grid grid--two">
-        <SectionCard title="Sign In">
+        <SectionCard eyebrow="Auth" title="Sign In To The Workspace" aside={<span className="badge">JWT Session</span>}>
           <form className="form" onSubmit={handleSubmit}>
             <label className="field">
               <span>Email</span>
@@ -65,22 +65,38 @@ export default function LoginPage() {
           </form>
         </SectionCard>
 
-        <SectionCard title="Current Session">
+        <SectionCard eyebrow="Session" title="Access Briefing">
           {session ? (
             <>
               <p>
                 Signed in as <strong>{session.user.full_name}</strong> ({session.user.role}).
               </p>
+              <div className="stat-row">
+                <span>Role</span>
+                <strong>{session.user.role}</strong>
+              </div>
+              <div className="stat-row">
+                <span>Email</span>
+                <strong>{session.user.email}</strong>
+              </div>
               <p className="muted">The access token is stored in local browser storage for this demo UI.</p>
               <Link className="button" href="/dashboard">
-                Open Dashboard
+                Open Watchlist
               </Link>
             </>
           ) : (
             <>
               <p>No session is stored yet.</p>
+              <div className="stat-row">
+                <span>Default Email</span>
+                <strong>admin@example.com</strong>
+              </div>
+              <div className="stat-row">
+                <span>Default Password</span>
+                <strong>admin123</strong>
+              </div>
               <p className="muted">
-                Default local credentials are prefilled for the bootstrapped admin user created by the backend.
+                The form is prefilled with the bootstrapped admin account created by the backend bootstrap step.
               </p>
             </>
           )}
