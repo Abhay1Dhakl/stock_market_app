@@ -7,10 +7,12 @@ from app.api import admin, analysis, auth, companies, news
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.services.bootstrap import ensure_default_access_control
+from app.services.migrations import run_database_migrations
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    run_database_migrations()
     ensure_default_access_control()
     yield
 
