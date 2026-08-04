@@ -19,7 +19,16 @@ from sqlalchemy import select
 from app.core.database import SessionLocal, engine
 from app.core.security import get_password_hash
 from app.main import app
-from app.models import Base, Company, CompanyAnalysisSnapshot, DailyPrice, NewsArticle, NewsCompanyTag, Role, User
+from app.models import (
+    Base,
+    Company,
+    CompanyAnalysisSnapshot,
+    DailyPrice,
+    NewsArticle,
+    NewsCompanyTag,
+    Role,
+    User,
+)
 
 
 @pytest.fixture(scope="session", autouse=True)

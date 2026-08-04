@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date as calendar_date
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -28,7 +29,7 @@ class CompanyListResponse(BaseModel):
 class DailyPriceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    trading_date: date
+    trading_date: calendar_date
     open_price: Decimal
     high_price: Decimal
     low_price: Decimal
@@ -47,7 +48,7 @@ class CompanyPricesResponse(BaseModel):
 class FloorsheetTransactionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    trading_date: date
+    trading_date: calendar_date
     transaction_time: Optional[datetime] = None
     buyer_broker_code: str
     seller_broker_code: str
@@ -59,5 +60,5 @@ class FloorsheetTransactionResponse(BaseModel):
 
 class CompanyFloorsheetResponse(BaseModel):
     company_id: int
-    date: Optional[date] = None
+    date: Optional[calendar_date] = None
     items: list[FloorsheetTransactionResponse]

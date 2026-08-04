@@ -27,8 +27,32 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
 async function safeReadError(response: Response): Promise<string | null> {
   try {
-    const payload = (await response.json()) as { detail?: string };
-    return payload.detail ?? null;
+    const payload = (await response.json()) as {
+      detail?:
+        | string
+        | Array<{ loc?: Array<string | number>; msg?: string; type?: string }>
+        | Record<string, unknown>;
+    };
+
+    if (typeof payload.detail === "string") {
+      return payload.detail;
+    }
+
+    if (Array.isArray(payload.detail)) {
+      return payload.detail
+        .map((item) => {
+          const field = item.loc?.slice(1).join(".") ?? "request";
+          return item.msg ? `${field}: ${item.msg}` : null;
+        })
+        .filter((value): value is string => Boolean(value))
+        .join("; ");
+    }
+
+    if (payload.detail && typeof payload.detail === "object") {
+      return JSON.stringify(payload.detail);
+    }
+
+    return null;
   } catch {
     return null;
   }
