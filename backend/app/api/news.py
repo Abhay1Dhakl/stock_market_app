@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db_session
@@ -11,6 +11,7 @@ from app.core.permissions import RoleName, require_role
 from app.models.news import NewsCompanyTag, NewsTagCorrection
 from app.models.user import User
 from app.repositories.news_repository import get_news_article_by_id, list_companies_by_ids, list_news_articles
+from app.services.categorization_service import REVIEW_CONFIDENCE_THRESHOLD, list_review_queue_articles
 from app.schemas.news import (
     NewsArticleSummary,
     NewsListResponse,
@@ -51,11 +52,23 @@ def _serialize_article(article) -> NewsArticleSummary:
 @router.get("", response_model=NewsListResponse)
 async def list_news(
     company_id: Optional[int] = None,
+    limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db_session),
     _: User = Depends(require_role(RoleName.ADMIN, RoleName.ANALYST, RoleName.VIEWER)),
 ) -> NewsListResponse:
-    articles = list_news_articles(db, company_id=company_id)
+    articles = list_news_articles(db, company_id=company_id, limit=limit)
     return NewsListResponse(company_id=company_id, items=[_serialize_article(article) for article in articles])
+
+
+@router.get("/review-queue", response_model=NewsListResponse)
+async def get_review_queue(
+    limit: int = Query(default=50, ge=1, le=200),
+    confidence_threshold: Decimal = Query(default=REVIEW_CONFIDENCE_THRESHOLD, ge=0, le=1),
+    db: Session = Depends(get_db_session),
+    _: User = Depends(require_role(RoleName.ADMIN, RoleName.ANALYST)),
+) -> NewsListResponse:
+    articles = list_review_queue_articles(db, threshold=confidence_threshold, limit=limit)
+    return NewsListResponse(items=[_serialize_article(article) for article in articles])
 
 
 @router.post("/{news_id}/recategorize", response_model=NewsRecategorizeResponse)

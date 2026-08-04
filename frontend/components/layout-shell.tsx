@@ -8,6 +8,7 @@ type LayoutShellProps = {
 };
 
 const navItems = [
+  { href: "/", label: "Home" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/review", label: "Review" },
   { href: "/admin", label: "Admin" },

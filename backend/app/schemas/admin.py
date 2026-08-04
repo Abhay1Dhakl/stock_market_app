@@ -25,6 +25,10 @@ class CrawlRunResponse(BaseModel):
     requested_by: Optional[str] = None
 
 
+class CrawlRunListResponse(BaseModel):
+    items: list[CrawlRunResponse]
+
+
 class UserSummaryResponse(BaseModel):
     id: int
     full_name: str

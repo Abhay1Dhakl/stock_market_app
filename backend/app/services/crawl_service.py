@@ -16,6 +16,8 @@ from app.crawlers.merolagani import MeroLaganiCrawler
 from app.crawlers.sharesansar import ShareSansarCrawler
 from app.models import Company, CrawlRun, DailyPrice, FloorsheetTransaction, NewsArticle
 from app.repositories.company_repository import list_active_companies
+from app.services.analysis_service import compute_analysis_snapshots
+from app.services.categorization_service import categorize_news_articles
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +52,9 @@ def execute_crawl_run(db: Session, crawl_run_id: int) -> CrawlRun:
 
         if crawl_run.run_kind in {"market_data", "full"}:
             stats["market_data"] = crawl_market_dataset(db, crawl_run)
+
+        stats["categorization"] = categorize_news_articles(db, only_missing=False)
+        stats["analysis"] = compute_analysis_snapshots(db)
 
         crawl_run = db.get(CrawlRun, crawl_run_id)
         if crawl_run is None:

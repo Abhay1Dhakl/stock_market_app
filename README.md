@@ -1,42 +1,122 @@
 # Stock Market Application
 
-This repository contains the take-home assignment for a stock market application focused on:
+Submission-ready take-home assignment for crawling NEPSE-related news and market data, automatically categorizing news against tracked companies, computing behavior-analysis outputs, and exposing the workflow through role-based backend and frontend screens.
 
-- crawling market news from multiple portals
-- categorizing each article against a company watchlist
-- computing behavior-analysis outputs from price and floorsheet data
-- exposing everything through a role-based dashboard
+## What Is Implemented
 
-## Current Status
+- FastAPI backend with JWT authentication and RBAC for `admin`, `analyst`, and `viewer`
+- PostgreSQL schema for companies, crawl runs, news, tags, daily prices, floorsheet rows, and analysis snapshots
+- Live news crawling from `sharesansar.com` and `merolagani.com`
+- Live daily price and floorsheet ingestion from `sharesansar.com`
+- Rule-based multi-label news categorization with confidence scores
+- Manual analyst/admin recategorization with correction history
+- Derived behavior-analysis snapshots:
+  - VWAP
+  - price and volume change percentages
+  - pressure indicator
+  - volume anomaly flag
+  - news count and sentiment score
+  - next-day price/volume movement references
+  - top broker net-position summary
+- Celery worker + beat wiring for scheduled crawl support
+- Next.js frontend pages for:
+  - login
+  - dashboard
+  - company detail
+  - review queue
+  - admin console
 
-Phase 1 scaffold is in place:
-
-- FastAPI backend shell
-- Next.js frontend shell
-- Docker Compose baseline for backend, frontend, PostgreSQL, and Redis
-- Folder structure aligned with the assignment brief
-
-## Planned Stack
+## Tech Stack
 
 - Backend: FastAPI, SQLAlchemy, Alembic, Celery, Redis, PostgreSQL
-- Frontend: Next.js, React, TypeScript
-- Categorization: rule-based multi-label baseline with confidence scoring
+- Frontend: Next.js 15, React 19, TypeScript
+- Crawling/parsing: `httpx`, `beautifulsoup4`, `lxml`
+- Categorization: rule-based matcher with alias/symbol confidence scoring
 
-## Next Step
+## Seeded Company Universe
 
-Phase 2 will define the database schema and core models for:
+The app auto-seeds six NEPSE companies on crawl/analysis execution:
 
-- users and roles
-- companies and watchlist metadata
-- news articles and categorizations
-- daily prices and floorsheet transactions
-- crawl runs and computed analysis snapshots
+- `NABIL`
+- `NTC`
+- `SHIVM`
+- `UPPER`
+- `SICL`
+- `CHCL`
+
+## Local Run
+
+1. Copy the environment file:
+
+```bash
+cp .env.example .env
+```
+
+2. Start the full stack:
+
+```bash
+docker compose up --build
+```
+
+3. Run the database migration:
+
+```bash
+docker compose exec backend alembic upgrade head
+```
+
+4. Open the app:
+
+- Frontend: `http://localhost:3000`
+- Backend docs: `http://localhost:8000/docs`
 
 ## Default Admin
 
-When the backend starts with a reachable database, it can bootstrap a default admin user for local/demo use:
+Bootstrapped local admin credentials:
 
-- email: `admin@example.com`
-- password: `admin123`
+- Email: `admin@example.com`
+- Password: `admin123`
 
-Override these with the `BOOTSTRAP_ADMIN_*` environment variables.
+These can be overridden with `BOOTSTRAP_ADMIN_*` values in `.env`.
+
+## Recommended Demo Flow
+
+1. Sign in from `/login`
+2. Open `/admin`
+3. Trigger a `full` crawl with `execute inline now` enabled
+4. Open `/dashboard`
+5. Drill into a company detail page
+6. Open `/review` and manually correct any low-confidence article
+
+## Useful Commands
+
+Start only the worker locally:
+
+```bash
+make worker
+```
+
+Start only beat locally:
+
+```bash
+make beat
+```
+
+Run backend tests:
+
+```bash
+python3 -m pytest backend/tests -q
+```
+
+## Verification Completed
+
+Verified on August 4, 2026:
+
+- Backend tests: `16 passed`
+- Backend compile pass: `python3 -m compileall backend/app`
+- Frontend production build: `docker compose run --rm --no-deps frontend npm run build`
+
+## Notes On Scope
+
+- Categorization is intentionally rule-based rather than ML-heavy to keep the end-to-end product working and reviewable within the assignment timebox.
+- The frontend is focused on a functional demo workflow rather than chart-heavy polish.
+- Market-data crawling currently uses ShareSansar as the live source for OHLCV and floorsheet sampling.

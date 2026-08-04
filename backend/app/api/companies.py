@@ -53,6 +53,16 @@ async def list_companies(
     return CompanyListResponse(items=[CompanySummary.model_validate(company) for company in companies])
 
 
+@router.get("/{company_id}", response_model=CompanySummary)
+async def get_company(
+    company_id: int,
+    db: Session = Depends(get_db_session),
+    _: User = Depends(require_role(RoleName.ADMIN, RoleName.ANALYST, RoleName.VIEWER)),
+) -> CompanySummary:
+    company = _get_company_or_404(db, company_id)
+    return CompanySummary.model_validate(company)
+
+
 @router.get("/{company_id}/prices", response_model=CompanyPricesResponse)
 async def get_company_prices(
     company_id: int,

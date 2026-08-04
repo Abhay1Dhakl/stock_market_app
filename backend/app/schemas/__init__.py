@@ -1,4 +1,4 @@
-from app.schemas.admin import CrawlRunRequest, CrawlRunResponse, UserListResponse, UserSummaryResponse
+from app.schemas.admin import CrawlRunListResponse, CrawlRunRequest, CrawlRunResponse, UserListResponse, UserSummaryResponse
 from app.schemas.analysis import BehaviorSummaryResponse, NewsPriceCorrelationResponse
 from app.schemas.auth import LoginRequest, TokenResponse, UserProfile
 from app.schemas.company import (
@@ -24,6 +24,7 @@ __all__ = [
     "BehaviorSummaryResponse",
     "NewsPriceCorrelationResponse",
     "CrawlRunRequest",
+    "CrawlRunListResponse",
     "CrawlRunResponse",
     "UserSummaryResponse",
     "UserListResponse",

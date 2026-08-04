@@ -39,3 +39,15 @@ def list_companies_by_ids(db: Session, company_ids: list[int]) -> list[Company]:
         return []
     statement = select(Company).where(Company.id.in_(company_ids)).order_by(Company.symbol.asc())
     return list(db.scalars(statement).all())
+
+
+def list_news_articles_by_ids(db: Session, news_ids: list[int]) -> list[NewsArticle]:
+    if not news_ids:
+        return []
+    statement = (
+        select(NewsArticle)
+        .options(selectinload(NewsArticle.tags).selectinload(NewsCompanyTag.company))
+        .where(NewsArticle.id.in_(news_ids))
+        .order_by(NewsArticle.published_at.desc(), NewsArticle.id.desc())
+    )
+    return list(db.scalars(statement).unique().all())
