@@ -17,6 +17,15 @@ ANOMALY_MULTIPLIER = Decimal("1.8")
 
 
 def compute_analysis_snapshots(db: Session, *, company_ids: list[int] | None = None) -> dict[str, int]:
+    """Materialize per-company daily analysis snapshots from stored market data.
+
+    Args:
+        db: Active SQLAlchemy session used for reads and snapshot writes.
+        company_ids: Optional subset of company IDs to recompute.
+
+    Returns:
+        dict[str, int]: Counts of processed companies and written snapshots.
+    """
     company_statement = select(Company).where(Company.is_active.is_(True)).order_by(Company.symbol.asc())
     if company_ids:
         company_statement = company_statement.where(Company.id.in_(company_ids))
@@ -54,6 +63,7 @@ def compute_analysis_snapshots(db: Session, *, company_ids: list[int] | None = N
             .all()
         )
 
+        # Pre-group supporting signals by session so snapshot assembly stays linear.
         floorsheet_by_date = defaultdict(list)
         for row in floorsheet_rows:
             floorsheet_by_date[row.trading_date].append(row)
@@ -138,6 +148,7 @@ def compute_analysis_snapshots(db: Session, *, company_ids: list[int] | None = N
             snapshot.next_day_volume_change_pct = (
                 _pct_change(Decimal(next_row.volume), Decimal(row.volume)) if next_row is not None else None
             )
+            # Store lightweight UI-ready context so reads avoid re-aggregating raw rows.
             snapshot.snapshot_payload = {
                 "top_brokers": top_brokers,
                 "news_headlines": [article.headline for article in related_articles[:5]],
@@ -159,6 +170,16 @@ def compute_analysis_snapshots(db: Session, *, company_ids: list[int] | None = N
 
 
 def _pct_change(current: Decimal, previous: Decimal | None) -> Decimal | None:
+    """Compute a rounded percentage change between two numeric values.
+
+    Args:
+        current: Current value in the comparison window.
+        previous: Previous value used as the baseline.
+
+    Returns:
+        Decimal | None: Percentage change rounded to four decimals, or `None`
+        when the baseline is missing or zero.
+    """
     if previous in (None, Decimal("0")):
         return None
     value = ((current - previous) / previous) * Decimal("100")
@@ -166,6 +187,15 @@ def _pct_change(current: Decimal, previous: Decimal | None) -> Decimal | None:
 
 
 def _compute_snapshot_vwap(price_row: DailyPrice, floorsheet_rows: list[FloorsheetTransaction]) -> Decimal:
+    """Choose a snapshot VWAP from floorsheet rows or fall back to close price.
+
+    Args:
+        price_row: Daily OHLCV row for the target trading session.
+        floorsheet_rows: Sampled trade rows for the same trading date.
+
+    Returns:
+        Decimal: VWAP rounded to four decimals for snapshot persistence.
+    """
     if floorsheet_rows:
         prices = [float(row.rate) for row in floorsheet_rows]
         volumes = [row.quantity for row in floorsheet_rows]
@@ -174,6 +204,15 @@ def _compute_snapshot_vwap(price_row: DailyPrice, floorsheet_rows: list[Floorshe
 
 
 def _build_anomaly_thresholds(volumes: list[int]) -> list[Decimal]:
+    """Build rolling anomaly thresholds from historical daily volumes.
+
+    Args:
+        volumes: Chronological traded-volume series for one company.
+
+    Returns:
+        list[Decimal]: Rolling average thresholds scaled by the anomaly
+        multiplier for each trading day.
+    """
     thresholds: list[Decimal] = []
     running_total = Decimal("0")
     for index, volume in enumerate(volumes, start=1):
@@ -184,4 +223,13 @@ def _build_anomaly_thresholds(volumes: list[int]) -> list[Decimal]:
 
 
 def _decimalize(value: Decimal | float, *, places: str) -> Decimal:
+    """Round a numeric value into a quantized Decimal representation.
+
+    Args:
+        value: Numeric value to normalize.
+        places: Decimal quantization pattern such as `0.0001`.
+
+    Returns:
+        Decimal: Rounded decimal value using half-up rounding.
+    """
     return Decimal(str(value)).quantize(Decimal(places), rounding=ROUND_HALF_UP)

@@ -22,6 +22,17 @@ def categorize_news_articles(
     article_ids: list[int] | None = None,
     only_missing: bool = False,
 ) -> dict[str, int]:
+    """Tag articles against the active watchlist and persist confidence scores.
+
+    Args:
+        db: Active SQLAlchemy session used for article and tag writes.
+        article_ids: Optional subset of article IDs to process.
+        only_missing: When `True`, skip articles that already have tags.
+
+    Returns:
+        dict[str, int]: Categorization counters including processed, tagged,
+        review-candidate, and fallback totals.
+    """
     companies = list(db.scalars(select(Company).where(Company.is_active.is_(True)).order_by(Company.symbol.asc())).all())
     if not companies:
         return {
@@ -52,6 +63,7 @@ def categorize_news_articles(
                 continue
 
             article.sentiment_label = score_sentiment(f"{article.headline}\n{article.body_text}")
+            # Preserve analyst corrections as the source of truth over rerun automation.
             manual_tags = [tag for tag in article.tags if tag.tag_source == "manual"]
             if manual_tags:
                 manual_skipped += 1
@@ -59,6 +71,7 @@ def categorize_news_articles(
                 continue
 
             try:
+                # Prefer the configured LLM matcher, but keep deterministic fallback coverage.
                 matches = (
                     gemini_matcher.match(article.headline, article.body_text)
                     if gemini_matcher is not None
@@ -69,6 +82,7 @@ def categorize_news_articles(
                 matches = rule_matcher.match(article.headline, article.body_text)
                 fallback_articles += 1
 
+            # Replace only system tags so repeated runs never erase manual review decisions.
             for existing_tag in [tag for tag in article.tags if tag.tag_source == "system"]:
                 db.delete(existing_tag)
             db.flush()
@@ -116,6 +130,16 @@ def list_review_queue_articles(
     threshold: Decimal = REVIEW_CONFIDENCE_THRESHOLD,
     limit: int = 50,
 ) -> list[NewsArticle]:
+    """Collect articles that still need analyst review.
+
+    Args:
+        db: Active SQLAlchemy session used for article reads.
+        threshold: Minimum acceptable confidence before review is required.
+        limit: Maximum number of queued articles to return.
+
+    Returns:
+        list[NewsArticle]: Ordered review-queue articles for the UI/API.
+    """
     articles = list(
         db.scalars(
             select(NewsArticle)
@@ -146,6 +170,15 @@ def list_review_queue_articles(
 
 
 def _build_categorization_matcher(companies: list[Company]) -> GeminiWatchlistMatcher | None:
+    """Build the configured categorization provider for the active watchlist.
+
+    Args:
+        companies: Active watchlist companies exposed to the matcher.
+
+    Returns:
+        GeminiWatchlistMatcher | None: Configured Gemini matcher when enabled
+        and fully configured, otherwise `None` to force rule-based matching.
+    """
     provider = settings.categorization_provider.strip().lower()
     if provider != "gemini":
         return None

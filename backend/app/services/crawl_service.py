@@ -33,6 +33,11 @@ NEWS_CRAWLER_REGISTRY = {
 
 
 def _resolve_seed_company_file() -> Path | None:
+    """Resolve the watchlist seed file from container or local paths.
+
+    Returns:
+        Path | None: Existing seed file path if found, otherwise `None`.
+    """
     candidates = [
         Path("/data/seed/companies.json"),
         Path(__file__).resolve().parents[3] / "data" / "seed" / "companies.json",
@@ -46,6 +51,15 @@ def _resolve_seed_company_file() -> Path | None:
 
 
 def execute_crawl_run(db: Session, crawl_run_id: int) -> CrawlRun:
+    """Run the full crawl pipeline for a persisted crawl-run record.
+
+    Args:
+        db: Active SQLAlchemy session used for crawl state and writes.
+        crawl_run_id: Database identifier of the crawl run to execute.
+
+    Returns:
+        CrawlRun: Refreshed crawl-run row with final status and run stats.
+    """
     crawl_run = db.get(CrawlRun, crawl_run_id)
     if crawl_run is None:
         raise ValueError(f"Crawl run {crawl_run_id} does not exist.")
@@ -94,6 +108,16 @@ def execute_crawl_run(db: Session, crawl_run_id: int) -> CrawlRun:
 
 
 def crawl_news_sources(db: Session, crawl_run: CrawlRun) -> dict[str, object]:
+    """Fetch and ingest news articles from the requested crawler sources.
+
+    Args:
+        db: Active SQLAlchemy session used for persistence.
+        crawl_run: Crawl-run record describing the requested sources.
+
+    Returns:
+        dict[str, object]: Per-source crawl summary with fetched, created,
+        duplicate, and failure counts.
+    """
     requested_sources = [source.strip().lower() for source in crawl_run.requested_sources if source.strip()]
     sources = [source for source in requested_sources if source in NEWS_CRAWLER_REGISTRY] or sorted(NEWS_CRAWLER_REGISTRY)
 
@@ -129,7 +153,17 @@ def crawl_news_sources(db: Session, crawl_run: CrawlRun) -> dict[str, object]:
 
 
 def crawl_market_dataset(db: Session, crawl_run: CrawlRun) -> dict[str, object]:
+    """Fetch watchlist price history and sampled floorsheet rows.
+
+    Args:
+        db: Active SQLAlchemy session used for persistence.
+        crawl_run: Crawl-run record describing the requested sources.
+
+    Returns:
+        dict[str, object]: Market-data crawl summary for all active companies.
+    """
     requested_sources = [source.strip().lower() for source in crawl_run.requested_sources if source.strip()]
+    # The current market-data implementation is sourced from ShareSansar only.
     if requested_sources and "sharesansar" not in requested_sources:
         return {
             "status": "skipped",
@@ -182,6 +216,14 @@ def crawl_market_dataset(db: Session, crawl_run: CrawlRun) -> dict[str, object]:
 
 
 def ensure_seed_companies(db: Session) -> int:
+    """Bootstrap missing watchlist companies from the seed file.
+
+    Args:
+        db: Active SQLAlchemy session used for company inserts.
+
+    Returns:
+        int: Number of companies created from the seed payload.
+    """
     seed_company_file = _resolve_seed_company_file()
     if seed_company_file is None:
         return 0
@@ -215,6 +257,16 @@ def ensure_seed_companies(db: Session) -> int:
 
 
 def ingest_news_articles(db: Session, crawl_run_id: int, articles: list[CrawledArticle]) -> tuple[int, int]:
+    """Insert newly crawled articles while skipping duplicate source URLs.
+
+    Args:
+        db: Active SQLAlchemy session used for article inserts.
+        crawl_run_id: Crawl-run identifier to associate with new articles.
+        articles: Normalized crawler article payloads ready for persistence.
+
+    Returns:
+        tuple[int, int]: Counts of `(created_articles, duplicate_articles)`.
+    """
     article_urls = [article.url for article in articles]
     existing_urls = set()
     if article_urls:
@@ -252,6 +304,16 @@ def ingest_news_articles(db: Session, crawl_run_id: int, articles: list[CrawledA
 
 
 def upsert_daily_prices(db: Session, company: Company, bars: list[DailyTradingBar]) -> tuple[int, int]:
+    """Insert or update daily OHLCV rows for a single company.
+
+    Args:
+        db: Active SQLAlchemy session used for price writes.
+        company: Company receiving the crawled price bars.
+        bars: Parsed trading bars ordered by trading date.
+
+    Returns:
+        tuple[int, int]: Counts of `(created_rows, updated_rows)`.
+    """
     if not bars:
         return 0, 0
 
@@ -304,9 +366,20 @@ def upsert_daily_prices(db: Session, company: Company, bars: list[DailyTradingBa
 
 
 def insert_floorsheet_rows(db: Session, company: Company, trades: list[FloorsheetTrade]) -> int:
+    """Insert deduplicated floorsheet trades for a single company.
+
+    Args:
+        db: Active SQLAlchemy session used for floorsheet writes.
+        company: Company receiving the sampled trade rows.
+        trades: Parsed floorsheet trades from the crawler.
+
+    Returns:
+        int: Number of new floorsheet rows inserted.
+    """
     if not trades:
         return 0
 
+    # Repeated crawl runs can revisit the same tape, so dedupe on a stable trade fingerprint.
     row_hashes = [build_floorsheet_row_hash(company.symbol, trade) for trade in trades]
     existing_hashes = set(
         db.scalars(select(FloorsheetTransaction.row_hash).where(FloorsheetTransaction.row_hash.in_(row_hashes))).all()
@@ -342,6 +415,15 @@ def insert_floorsheet_rows(db: Session, company: Company, trades: list[Floorshee
 
 
 def build_floorsheet_row_hash(symbol: str, trade: FloorsheetTrade) -> str:
+    """Build a stable deduplication hash for one floorsheet trade row.
+
+    Args:
+        symbol: Company symbol used to namespace the trade.
+        trade: Floorsheet trade payload used to derive the hash.
+
+    Returns:
+        str: SHA-256 hex digest representing the unique trade identity.
+    """
     digest_source = "|".join(
         [
             symbol.upper(),

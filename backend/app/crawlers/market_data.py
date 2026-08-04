@@ -11,10 +11,12 @@ from app.crawlers.base import HTTPCrawlerSupport
 
 
 def _to_decimal(value: object) -> Decimal:
+    """Normalize crawler text or numeric input into a Decimal."""
     return Decimal(str(value).replace(",", "").strip())
 
 
 def _to_int(value: object) -> int:
+    """Normalize crawler text or numeric input into an integer."""
     return int(_to_decimal(value))
 
 @dataclass
@@ -48,6 +50,15 @@ class MarketDataCrawler(HTTPCrawlerSupport):
     floorsheet_endpoint = "https://www.sharesansar.com/company-floor-sheet"
 
     def fetch_company_history(self, symbol: str, days: int = 30) -> list[DailyTradingBar]:
+        """Fetch recent daily OHLCV history for one company symbol.
+
+        Args:
+            symbol: NEPSE symbol used to resolve the company context page.
+            days: Maximum number of trading sessions to return.
+
+        Returns:
+            list[DailyTradingBar]: Chronological market-history rows.
+        """
         context = self._fetch_company_context(symbol)
         payload = self._post_json(
             self.price_history_endpoint,
@@ -63,6 +74,17 @@ class MarketDataCrawler(HTTPCrawlerSupport):
         sample_days: int = 1,
         page_size: int = 200,
     ) -> list[FloorsheetTrade]:
+        """Fetch sampled floorsheet trades for the most recent trading days.
+
+        Args:
+            symbol: NEPSE symbol used to resolve the company context page.
+            sample_days: Number of distinct trading dates to collect.
+            page_size: Page size used against the floorsheet endpoint.
+
+        Returns:
+            list[FloorsheetTrade]: Parsed floorsheet trades across the sampled
+            trading dates.
+        """
         context = self._fetch_company_context(symbol)
         collected: list[FloorsheetTrade] = []
         target_dates: list[date] = []
@@ -86,6 +108,7 @@ class MarketDataCrawler(HTTPCrawlerSupport):
                 break
 
             for trade in page_rows:
+                # Stop once we have captured the requested number of distinct trading sessions.
                 if trade.trading_date not in target_dates:
                     if len(target_dates) >= sample_days:
                         return collected
@@ -99,6 +122,15 @@ class MarketDataCrawler(HTTPCrawlerSupport):
         return collected
 
     def parse_price_history_payload(self, payload: dict[str, object], *, days: int) -> list[DailyTradingBar]:
+        """Parse the ShareSansar price-history payload into trading bars.
+
+        Args:
+            payload: Raw JSON payload returned by the history endpoint.
+            days: Maximum number of recent rows to keep.
+
+        Returns:
+            list[DailyTradingBar]: Chronological trading bars ready to store.
+        """
         rows = payload.get("data", [])
         if not isinstance(rows, list):
             return []
@@ -120,6 +152,14 @@ class MarketDataCrawler(HTTPCrawlerSupport):
         return bars
 
     def parse_floorsheet_payload(self, payload: dict[str, object]) -> list[FloorsheetTrade]:
+        """Parse the ShareSansar floorsheet payload into trade objects.
+
+        Args:
+            payload: Raw JSON payload returned by the floorsheet endpoint.
+
+        Returns:
+            list[FloorsheetTrade]: Normalized floorsheet trades for ingestion.
+        """
         rows = payload.get("data", [])
         if not isinstance(rows, list):
             return []
@@ -142,9 +182,19 @@ class MarketDataCrawler(HTTPCrawlerSupport):
         return trades
 
     def _fetch_company_context(self, symbol: str) -> dict[str, object]:
+        """Resolve CSRF headers and company identifiers from the company page.
+
+        Args:
+            symbol: NEPSE symbol whose company page should be inspected.
+
+        Returns:
+            dict[str, object]: Request context for subsequent AJAX endpoint
+            calls, including company ID, symbol, and CSRF-aware headers.
+        """
         url = self.company_url_template.format(symbol=symbol.upper())
         soup = BeautifulSoup(self._get_text(url), "lxml")
 
+        # ShareSansar embeds the AJAX identifiers and CSRF token in the company page HTML.
         token_node = soup.select_one('meta[name="_token"]')
         company_id_node = soup.select_one("#companyid")
         symbol_node = soup.select_one("#symbol")
