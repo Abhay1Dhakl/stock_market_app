@@ -24,6 +24,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./backend:/app
+      - ./data:/data
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       POSTGRES_DB: ${POSTGRES_DB:-stock_market}

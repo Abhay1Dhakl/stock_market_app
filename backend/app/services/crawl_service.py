@@ -22,7 +22,6 @@ from app.services.categorization_service import categorize_news_articles
 logger = logging.getLogger(__name__)
 
 KATHMANDU_TZ = ZoneInfo("Asia/Kathmandu")
-SEED_COMPANY_FILE = Path(__file__).resolve().parents[3] / "data" / "seed" / "companies.json"
 NEWS_LIMIT_PER_SOURCE = 10
 MARKET_HISTORY_DAYS = 30
 FLOORSHEET_SAMPLE_DAYS = 2
@@ -31,6 +30,19 @@ NEWS_CRAWLER_REGISTRY = {
     "merolagani": MeroLaganiCrawler,
     "sharesansar": ShareSansarCrawler,
 }
+
+
+def _resolve_seed_company_file() -> Path | None:
+    candidates = [
+        Path("/data/seed/companies.json"),
+        Path(__file__).resolve().parents[3] / "data" / "seed" / "companies.json",
+    ]
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    return None
 
 
 def execute_crawl_run(db: Session, crawl_run_id: int) -> CrawlRun:
@@ -170,10 +182,11 @@ def crawl_market_dataset(db: Session, crawl_run: CrawlRun) -> dict[str, object]:
 
 
 def ensure_seed_companies(db: Session) -> int:
-    if not SEED_COMPANY_FILE.exists():
+    seed_company_file = _resolve_seed_company_file()
+    if seed_company_file is None:
         return 0
 
-    company_payload = json.loads(SEED_COMPANY_FILE.read_text(encoding="utf-8"))
+    company_payload = json.loads(seed_company_file.read_text(encoding="utf-8"))
     existing_symbols = set(db.scalars(select(Company.symbol)).all())
     created_count = 0
 
