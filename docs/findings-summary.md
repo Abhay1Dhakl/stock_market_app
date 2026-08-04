@@ -2,7 +2,7 @@
 
 Date of analysis: **August 4, 2026**
 
-This summary is based on the current local dataset produced by the live crawl pipeline in this repository. At the time of writing, the application had seeded **6 companies**, created **180 daily price rows**, stored **24 news articles**, auto-tagged **1 article**, and placed **23 articles** into the manual review queue.
+This summary is based on the current local dataset produced by the live crawl pipeline in this repository. At the time of writing, the application had seeded **6 companies**, created **180 daily price rows**, stored **1,508 floorsheet rows**, stored **24 news articles**, auto-tagged **1 article**, and placed **23 articles** into the manual review queue.
 
 ## Most Interesting Observed Pattern
 
@@ -41,15 +41,14 @@ In practical terms, the current build demonstrates that the **review workflow is
 
 ## Buyer/Seller Behavior Note
 
-The codebase supports broker aggregation, top buyers, top sellers, and net accumulation/distribution views. However, on the latest live crawl used for this summary, the source returned **no floorsheet rows**, so broker-level findings could not yet be defended from live data in this specific run.
+The broker-analysis path is no longer only structural in this dataset. On the latest live crawl dated **August 4, 2026**, the system stored **1,508 floorsheet rows across all 6 tracked companies**, which means the buyer/seller panels and broker snapshots are backed by real captured trades in the current run.
 
-The implementation still supports this analysis path:
+Two concrete examples from the live data:
 
-- floorsheet ingestion and dedupe are implemented in the backend
-- broker aggregation is computed in analysis snapshots
-- the frontend company board renders buyer/seller panels when floorsheet rows exist
+- `NABIL` had the deepest sampled tape in the current dataset with **454** floorsheet trades in the latest snapshot. Its persisted broker summary showed broker `92` as the strongest net accumulator at **+19,022** shares, followed by brokers `49`, `28`, `11`, and `36`.
+- `CHCL` showed a highly concentrated broker-flow pattern on the sampled date, where broker `52` finished with a net buy position of **+30,236** shares, materially ahead of the next-largest broker in that name.
 
-So the broker-analysis feature is structurally complete, but the current live evidence is limited by source availability rather than by missing application logic.
+That matters because it turns the buyer/seller section from a placeholder visualization into a defendable part of the assignment: the backend is ingesting floorsheet rows, the analysis service is aggregating broker positions into snapshots, and the company board is rendering both raw execution rows and derived net-flow summaries from live data.
 
 ## Bottom Line
 

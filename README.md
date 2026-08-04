@@ -266,6 +266,7 @@ Verified on **August 4, 2026**:
 - live crawl verification:
   - `6` companies seeded
   - `180` daily price rows created
+  - `1,508` floorsheet rows stored
   - `24` news articles stored
   - `1` auto-tagged article
   - `23` review-queue candidates
@@ -278,7 +279,7 @@ Verified on **August 4, 2026**:
 - The categorization path is Gemini-first with a deterministic fallback matcher rather than a custom trained finance classifier.
 - The watchlist is seeded from JSON for bootstrap speed, then managed through the admin surface.
 - Report export is provided as a CSV summary rather than a styled PDF report pack.
-- Broker analysis depends on live floorsheet availability from the source site. The code path exists, tests cover it, and the UI supports it, but some live runs may return zero floorsheet rows.
+- Broker analysis is working against the current local dataset, which includes live floorsheet rows. Future crawls still depend on source availability and may return thinner broker coverage on some dates.
 - Local `docker compose` execution is the primary delivery path. No public deployment URL is included in this repository.
 
 ## Useful Commands
