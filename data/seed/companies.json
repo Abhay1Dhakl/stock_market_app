@@ -1,0 +1,50 @@
+[
+  {
+    "symbol": "NABIL",
+    "name": "Nabil Bank Limited",
+    "sector": "Commercial Banks",
+    "aliases": ["Nabil", "Nabil Bank"],
+    "description": "Large private-sector commercial bank listed on NEPSE.",
+    "is_active": true
+  },
+  {
+    "symbol": "NTC",
+    "name": "Nepal Doorsanchar Company Limited",
+    "sector": "Telecommunication",
+    "aliases": ["Nepal Telecom", "Doorsanchar"],
+    "description": "National telecommunications company listed on NEPSE.",
+    "is_active": true
+  },
+  {
+    "symbol": "SHIVM",
+    "name": "Shivam Cements Limited",
+    "sector": "Manufacturing And Processing",
+    "aliases": ["Shivam", "Shivam Cements"],
+    "description": "Cement manufacturer with active trading volume on NEPSE.",
+    "is_active": true
+  },
+  {
+    "symbol": "UPPER",
+    "name": "Upper Tamakoshi Hydropower Limited",
+    "sector": "Hydro Power",
+    "aliases": ["Upper Tamakoshi", "Tamakoshi"],
+    "description": "Hydropower company used as a representative energy-sector stock.",
+    "is_active": true
+  },
+  {
+    "symbol": "SICL",
+    "name": "Shikhar Insurance Company Limited",
+    "sector": "Non Life Insurance",
+    "aliases": ["Shikhar Insurance", "Shikhar"],
+    "description": "Non-life insurance company included for sector diversity.",
+    "is_active": true
+  },
+  {
+    "symbol": "CHCL",
+    "name": "Chilime Hydropower Company Limited",
+    "sector": "Hydro Power",
+    "aliases": ["Chilime", "Chilime Hydropower"],
+    "description": "Hydropower company with long trading history on NEPSE.",
+    "is_active": true
+  }
+]

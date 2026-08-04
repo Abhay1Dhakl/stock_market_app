@@ -1,4 +1,4 @@
-.PHONY: up down logs backend-dev frontend-dev
+.PHONY: up down logs backend-dev frontend-dev worker beat
 
 up:
 	docker compose up --build
@@ -15,3 +15,8 @@ backend-dev:
 frontend-dev:
 	cd frontend && npm install && npm run dev
 
+worker:
+	cd backend && celery -A app.celery_app.celery_app worker --loglevel=info
+
+beat:
+	cd backend && celery -A app.celery_app.celery_app beat --loglevel=info

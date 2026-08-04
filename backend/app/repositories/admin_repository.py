@@ -13,7 +13,7 @@ def create_crawl_run(
     *,
     run_kind: str,
     requested_sources: list[str],
-    triggered_by_user_id: int,
+    triggered_by_user_id: Optional[int],
 ) -> CrawlRun:
     crawl_run = CrawlRun(
         run_kind=run_kind,

@@ -7,6 +7,7 @@ from app.models.user import User
 from app.repositories.admin_repository import create_crawl_run, get_crawl_run_by_id
 from app.repositories.user_repository import list_users
 from app.schemas.admin import CrawlRunRequest, CrawlRunResponse, UserListResponse, UserSummaryResponse
+from app.tasks.crawl_tasks import run_crawl_pipeline
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -23,6 +24,17 @@ async def trigger_crawl_run(
         requested_sources=payload.sources,
         triggered_by_user_id=user.id,
     )
+    try:
+        run_crawl_pipeline.delay(crawl_run.id)
+    except Exception as exc:
+        crawl_run.status = "failed"
+        crawl_run.error_message = f"Unable to enqueue crawl run: {exc}"
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to enqueue crawl run. Ensure Redis and the Celery worker are running.",
+        ) from exc
+
     return CrawlRunResponse(
         id=crawl_run.id,
         run_kind=crawl_run.run_kind,
