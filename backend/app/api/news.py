@@ -1,38 +1,122 @@
-from typing import List, Optional
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from decimal import Decimal
+from typing import Optional
 
-from app.core.permissions import Role, require_role
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db_session
+from app.core.permissions import RoleName, require_role
+from app.models.news import NewsCompanyTag, NewsTagCorrection
+from app.models.user import User
+from app.repositories.news_repository import get_news_article_by_id, list_companies_by_ids, list_news_articles
+from app.schemas.news import (
+    NewsArticleSummary,
+    NewsListResponse,
+    NewsRecategorizeResponse,
+    RecategorizeRequest,
+    TaggedCompanySummary,
+)
 
 router = APIRouter(prefix="/news", tags=["news"])
 
 
-class RecategorizeRequest(BaseModel):
-    company_ids: List[int]
-    notes: Optional[str] = None
+def _serialize_tag(tag: NewsCompanyTag) -> TaggedCompanySummary:
+    return TaggedCompanySummary(
+        company_id=tag.company_id,
+        symbol=tag.company.symbol,
+        name=tag.company.name,
+        confidence_score=tag.confidence_score,
+        tag_source=tag.tag_source,
+        match_summary=tag.match_summary,
+    )
 
 
-@router.get("")
-async def list_news(company_id: Optional[int] = None) -> dict:
-    return {
-        "company_id": company_id,
-        "items": [],
-        "message": "Categorized news feed endpoint scaffolded.",
-    }
+def _serialize_article(article) -> NewsArticleSummary:
+    tags = sorted(article.tags, key=lambda item: item.company.symbol)
+    return NewsArticleSummary(
+        id=article.id,
+        source_name=article.source_name,
+        source_url=article.source_url,
+        headline=article.headline,
+        excerpt=article.excerpt,
+        published_at=article.published_at,
+        crawled_at=article.crawled_at,
+        sentiment_label=article.sentiment_label,
+        tags=[_serialize_tag(tag) for tag in tags],
+    )
 
 
-@router.post("/{news_id}/recategorize")
+@router.get("", response_model=NewsListResponse)
+async def list_news(
+    company_id: Optional[int] = None,
+    db: Session = Depends(get_db_session),
+    _: User = Depends(require_role(RoleName.ADMIN, RoleName.ANALYST, RoleName.VIEWER)),
+) -> NewsListResponse:
+    articles = list_news_articles(db, company_id=company_id)
+    return NewsListResponse(company_id=company_id, items=[_serialize_article(article) for article in articles])
+
+
+@router.post("/{news_id}/recategorize", response_model=NewsRecategorizeResponse)
 async def recategorize_news(
     news_id: int,
     payload: RecategorizeRequest,
-    reviewer: dict = Depends(require_role(Role.ADMIN, Role.ANALYST)),
-) -> dict:
-    return {
-        "news_id": news_id,
-        "company_ids": payload.company_ids,
-        "notes": payload.notes,
-        "reviewed_by": reviewer["email"],
-        "message": "Manual recategorization flow scaffolded.",
-    }
+    db: Session = Depends(get_db_session),
+    reviewer: User = Depends(require_role(RoleName.ADMIN, RoleName.ANALYST)),
+) -> NewsRecategorizeResponse:
+    article = get_news_article_by_id(db, news_id)
+    if article is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="News article not found.")
 
+    unique_company_ids = list(dict.fromkeys(payload.company_ids))
+    companies = list_companies_by_ids(db, unique_company_ids)
+    if len(companies) != len(unique_company_ids):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="One or more companies were not found.")
+
+    previous_tags = [_serialize_tag(tag).model_dump(mode="json") for tag in article.tags]
+
+    for existing_tag in list(article.tags):
+        db.delete(existing_tag)
+    db.flush()
+
+    for company in companies:
+        db.add(
+            NewsCompanyTag(
+                news_article_id=article.id,
+                company_id=company.id,
+                confidence_score=Decimal("1.0"),
+                tag_source="manual",
+                match_summary="Manual analyst correction",
+                created_by_user_id=reviewer.id,
+            )
+        )
+
+    updated_tags = [
+        {
+            "company_id": company.id,
+            "symbol": company.symbol,
+            "name": company.name,
+            "confidence_score": "1.0",
+            "tag_source": "manual",
+        }
+        for company in companies
+    ]
+    correction = NewsTagCorrection(
+        news_article_id=article.id,
+        reviewer_user_id=reviewer.id,
+        previous_tags=previous_tags,
+        updated_tags=updated_tags,
+        notes=payload.notes,
+    )
+    db.add(correction)
+    db.commit()
+    db.refresh(correction)
+
+    return NewsRecategorizeResponse(
+        news_id=article.id,
+        company_ids=unique_company_ids,
+        correction_id=correction.id,
+        reviewed_by=reviewer.email,
+        notes=payload.notes,
+    )

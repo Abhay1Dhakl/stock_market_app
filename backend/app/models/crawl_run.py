@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -25,14 +26,14 @@ class CrawlRun(Base, TimestampMixin):
     run_kind: Mapped[str] = mapped_column(String(30), default="full", nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="queued", index=True, nullable=False)
     requested_sources: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
-    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     run_stats: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    triggered_by_user_id: Mapped[int | None] = mapped_column(
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    triggered_by_user_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
 
-    triggered_by: Mapped["User | None"] = relationship(back_populates="triggered_crawl_runs")
+    triggered_by: Mapped[Optional["User"]] = relationship(back_populates="triggered_crawl_runs")
     articles: Mapped[list["NewsArticle"]] = relationship(back_populates="crawl_run")

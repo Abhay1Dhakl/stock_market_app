@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import Optional
 
 from sqlalchemy import Boolean, Date, ForeignKey, Integer, JSON, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -22,17 +23,17 @@ class CompanyAnalysisSnapshot(Base, TimestampMixin):
         nullable=False,
     )
     trading_date: Mapped[date] = mapped_column(Date, nullable=False)
-    close_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
-    vwap: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
-    price_change_pct: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
-    volume_change_pct: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
-    pressure_indicator: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    close_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    vwap: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4), nullable=True)
+    price_change_pct: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
+    volume_change_pct: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
+    pressure_indicator: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     is_volume_anomaly: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    anomaly_threshold: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    anomaly_threshold: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
     news_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    news_sentiment_score: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
-    next_day_price_change_pct: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
-    next_day_volume_change_pct: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+    news_sentiment_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
+    next_day_price_change_pct: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
+    next_day_volume_change_pct: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
     snapshot_payload: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
 
     company: Mapped["Company"] = relationship(back_populates="analysis_snapshots")

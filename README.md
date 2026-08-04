@@ -32,3 +32,11 @@ Phase 2 will define the database schema and core models for:
 - daily prices and floorsheet transactions
 - crawl runs and computed analysis snapshots
 
+## Default Admin
+
+When the backend starts with a reachable database, it can bootstrap a default admin user for local/demo use:
+
+- email: `admin@example.com`
+- password: `admin123`
+
+Override these with the `BOOTSTRAP_ADMIN_*` environment variables.

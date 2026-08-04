@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from functools import lru_cache
+from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -8,6 +11,7 @@ class Settings(BaseSettings):
     app_name: str = "Stock Market Application"
     environment: str = Field(default="development", alias="ENVIRONMENT")
     api_prefix: str = "/api"
+    database_url_override: Optional[str] = Field(default=None, alias="DATABASE_URL")
 
     postgres_db: str = Field(default="stock_market", alias="POSTGRES_DB")
     postgres_user: str = Field(default="stock_user", alias="POSTGRES_USER")
@@ -20,6 +24,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     cors_origins_raw: str = Field(default="http://localhost:3000", alias="BACKEND_CORS_ORIGINS")
+    bootstrap_default_admin: bool = Field(default=True, alias="BOOTSTRAP_DEFAULT_ADMIN")
+    bootstrap_admin_name: str = Field(default="System Administrator", alias="BOOTSTRAP_ADMIN_NAME")
+    bootstrap_admin_email: str = Field(default="admin@example.com", alias="BOOTSTRAP_ADMIN_EMAIL")
+    bootstrap_admin_password: str = Field(default="admin123", alias="BOOTSTRAP_ADMIN_PASSWORD")
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -30,6 +38,8 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+        if self.database_url_override:
+            return self.database_url_override
         return (
             f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
@@ -46,4 +56,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-
