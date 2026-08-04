@@ -163,6 +163,18 @@ The written findings summary required by the assignment is in [docs/findings-sum
   - manual review desk
   - operations/admin console
 
+### Streamlit Companion
+
+- Framework: Streamlit
+- Purpose: lightweight Python-native dashboard and admin surface for quick demos or alternate deployment
+- Main surfaces:
+  - login and role-aware workspace switcher
+  - cross-company watchlist dashboard
+  - company board with charts, news, and floorsheet data
+  - review desk for manual recategorization
+  - admin console for crawl runs, users, and watchlist management
+  - CSV report export
+
 ### System Flow
 
 1. Crawl news and market data into PostgreSQL.
@@ -229,7 +241,46 @@ Note: the backend also attempts to run migrations on startup.
 4. Open the app:
 
 - Frontend: `http://localhost:3000`
+- Streamlit: `http://localhost:8501`
 - Backend docs: `http://localhost:8000/docs`
+
+## Streamlit Deployment
+
+You can run the Streamlit companion locally or deploy it separately from the Next.js frontend.
+
+### Local Streamlit Run
+
+With Docker Compose:
+
+```bash
+docker compose up --build streamlit
+```
+
+Without Docker:
+
+```bash
+cd streamlit_app
+python3 -m pip install -r requirements.txt
+STREAMLIT_API_BASE_URL=http://localhost:8000/api streamlit run app.py
+```
+
+### Streamlit Community Cloud
+
+The Streamlit app entrypoint is:
+
+- `streamlit_app/app.py`
+
+The dependency file is:
+
+- `streamlit_app/requirements.txt`
+
+Important deployment note:
+
+- Streamlit Community Cloud hosts the Python UI only. The FastAPI backend must already be reachable from the public internet.
+- Set `STREAMLIT_API_BASE_URL` in the Streamlit deployment settings or secrets to your live backend URL, for example `https://your-backend.example.com/api`.
+- Official deployment references:
+  - `https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app`
+  - `https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/app-dependencies`
 
 ## Default Admin Credentials
 
@@ -259,6 +310,7 @@ Verified on **August 4, 2026**:
 
 - backend tests: `22 passed`
 - frontend production build: `docker compose run --rm --no-deps frontend npm run build`
+- Streamlit companion syntax check: `python3 -m py_compile streamlit_app/app.py`
 - live API smoke:
   - `POST /api/auth/login`
   - `GET /api/admin/companies`
