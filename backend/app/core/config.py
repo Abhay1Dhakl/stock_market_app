@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     bootstrap_admin_name: str = Field(default="System Administrator", alias="BOOTSTRAP_ADMIN_NAME")
     bootstrap_admin_email: str = Field(default="admin@example.com", alias="BOOTSTRAP_ADMIN_EMAIL")
     bootstrap_admin_password: str = Field(default="admin123", alias="BOOTSTRAP_ADMIN_PASSWORD")
+    categorization_provider: str = Field(default="gemini", alias="CATEGORIZATION_PROVIDER")
+    gemini_api_key: Optional[str] = Field(default=None, alias="GEMINI_API_KEY")
+    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
+    gemini_timeout_seconds: float = Field(default=20.0, alias="GEMINI_TIMEOUT_SECONDS")
 
     model_config = SettingsConfigDict(
         env_file=".env",

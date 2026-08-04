@@ -11,7 +11,7 @@ This implementation intentionally prioritizes:
 - a working end-to-end crawl -> categorize -> analyze -> review flow
 - a functional Next.js dashboard with company detail, review, and admin operations
 
-Because the assignment is time-boxed, categorization is implemented as a rule-based multi-label matcher rather than a heavier ML or LLM classifier. That trade-off keeps the whole pipeline inspectable, testable, and runnable locally within the assignment window.
+Because the assignment is time-boxed, the categorization pipeline now supports an LLM-first path using Gemini 2.5 Flash with a deterministic rule-based fallback. That keeps the submission stronger on the AI/ML side without making local execution brittle when an external API key is unavailable.
 
 ## What Is Implemented
 
@@ -29,6 +29,8 @@ Because the assignment is time-boxed, categorization is implemented as a rule-ba
   - turnover
   - floorsheet sampling when the live source returns rows
 - Automatic multi-label company tagging with confidence scores
+- Gemini 2.5 Flash based categorization via structured JSON output when configured
+- Deterministic rule-based fallback categorization when Gemini is unavailable or disabled
 - Manual analyst/admin recategorization with correction history
 - Derived behavior-analysis snapshots:
   - VWAP
@@ -76,37 +78,44 @@ The assignment requested 5-10 companies. This repository currently uses 6 compan
 
 ## Categorization Approach
 
-The categorization engine is implemented as a rule-based watchlist matcher:
+The categorization engine now supports two paths:
 
-1. Normalize article title and body text.
-2. Build a term set from each tracked company's symbol, name, and aliases.
-3. Count exact symbol/alias hits in the title and body.
-4. Compute a confidence score from:
-   - alias hit count
-   - symbol hit count
-   - title hit count
-   - distinct matched terms
-   - article body length
-5. Persist every matched company as a separate tag to support multi-label tagging.
+1. **Gemini 2.5 Flash path**
+   - send the article headline, body, and tracked company watchlist to Gemini
+   - request structured JSON output through the Gemini Interactions API
+   - persist one or more company tags with model-provided confidence scores and short match summaries
+   - if the Gemini request fails at runtime, fall back to the rule-based matcher for that article
+
+2. **Rule-based fallback path**
+   - normalize article title and body text
+   - build a term set from each tracked company's symbol, name, and aliases
+   - count exact symbol/alias hits in the title and body
+   - compute a confidence score from:
+     - alias hit count
+     - symbol hit count
+     - title hit count
+     - distinct matched terms
+     - article body length
 
 Key files:
 
+- Gemini matcher: [`backend/app/categorization/gemini_matcher.py`](backend/app/categorization/gemini_matcher.py)
 - matcher: [`backend/app/categorization/entity_matcher.py`](backend/app/categorization/entity_matcher.py)
 - confidence scoring: [`backend/app/categorization/confidence.py`](backend/app/categorization/confidence.py)
 - orchestration: [`backend/app/services/categorization_service.py`](backend/app/services/categorization_service.py)
 
 ### Why This Approach
 
-- It is transparent and easy to reason about under time pressure.
-- It supports multi-label tagging cleanly.
-- It produces deterministic confidence scores that are easy to review.
-- It integrates well with a manual review queue.
+- Gemini 2.5 Flash gives a stronger AI-assisted categorization story for the assignment and interview discussion.
+- Structured JSON output keeps the model response machine-readable and easy to validate.
+- The fallback matcher preserves local reliability and keeps the review queue flowing even if the LLM path is unavailable.
+- Manual correction still remains the source of truth for bad or ambiguous tags.
 
 ### Trade-Offs
 
-- It is weaker than NER, embeddings, or LLM classification for indirect references and ambiguous phrasing.
-- It depends heavily on alias quality in the watchlist.
-- It tends to produce conservative results, which is why the manual review path is important.
+- The Gemini path depends on an external API key and introduces network latency and cost.
+- The fallback matcher still depends heavily on alias quality in the watchlist.
+- Neither path is a supervised finance-specific classifier, so manual review is still important for ambiguous articles.
 
 ## Behavior Analysis Outputs
 
@@ -194,6 +203,8 @@ OpenAPI is available at:
 ```bash
 cp .env.example .env
 ```
+
+If you want LLM-based categorization, set `GEMINI_API_KEY` in `.env`. The default provider is `gemini`, and the service falls back to the rule-based matcher if the key is missing or the API request fails.
 
 2. Start the full stack:
 
