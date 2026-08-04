@@ -1,41 +1,69 @@
 # Stock Market Application
 
-Submission-ready take-home assignment for crawling NEPSE-related news and market data, automatically categorizing news against tracked companies, computing behavior-analysis outputs, and exposing the workflow through role-based backend and frontend screens.
+Submission-oriented full-stack assignment for crawling NEPSE-related news and market data, automatically tagging news against a tracked company watchlist, computing behavior-analysis outputs, and exposing the workflow through role-aware backend and frontend screens.
+
+## Priority And Scope
+
+This implementation intentionally prioritizes:
+
+- backend architecture that is modular and production-shaped
+- server-side RBAC and API correctness
+- a working end-to-end crawl -> categorize -> analyze -> review flow
+- a functional Next.js dashboard with company detail, review, and admin operations
+
+Because the assignment is time-boxed, categorization is implemented as a rule-based multi-label matcher rather than a heavier ML or LLM classifier. That trade-off keeps the whole pipeline inspectable, testable, and runnable locally within the assignment window.
 
 ## What Is Implemented
 
-- FastAPI backend with JWT authentication and RBAC for `admin`, `analyst`, and `viewer`
-- PostgreSQL schema for companies, crawl runs, news, tags, daily prices, floorsheet rows, and analysis snapshots
-- Live news crawling from `sharesansar.com` and `merolagani.com`
-- Live daily price and floorsheet ingestion from `sharesansar.com`
-- Rule-based multi-label news categorization with confidence scores
+- FastAPI backend with JWT authentication and server-side RBAC for `admin`, `analyst`, and `viewer`
+- PostgreSQL schema separating:
+  - raw crawled news
+  - company watchlist and market data
+  - news/company tags and manual corrections
+  - computed daily analysis snapshots
+- Live news crawling from:
+  - `merolagani.com`
+  - `sharesansar.com`
+- Live market-data crawling from `sharesansar.com` for:
+  - daily OHLCV
+  - turnover
+  - floorsheet sampling when the live source returns rows
+- Automatic multi-label company tagging with confidence scores
 - Manual analyst/admin recategorization with correction history
 - Derived behavior-analysis snapshots:
   - VWAP
-  - price and volume change percentages
-  - pressure indicator
+  - daily price change percentage
+  - daily volume change percentage
+  - buy/sell pressure indicator
   - volume anomaly flag
-  - news count and sentiment score
-  - next-day price/volume movement references
-  - top broker net-position summary
-- Celery worker + beat wiring for scheduled crawl support
+  - tagged news count
+  - news sentiment score
+  - next-day price and volume movement references
+  - top broker net-position summary when floorsheet rows are available
+- Celery worker + beat scheduling for crawl execution
 - Next.js frontend pages for:
   - login
-  - dashboard
-  - company detail
-  - review queue
-  - admin console
+  - cross-company dashboard
+  - company detail board
+  - manual review desk
+  - operations/admin console
 
-## Tech Stack
+## Data Sources
 
-- Backend: FastAPI, SQLAlchemy, Alembic, Celery, Redis, PostgreSQL
-- Frontend: Next.js 15, React 19, TypeScript
-- Crawling/parsing: `httpx`, `beautifulsoup4`, `lxml`
-- Categorization: rule-based matcher with alias/symbol confidence scoring
+### News Portals
 
-## Seeded Company Universe
+- `https://merolagani.com/NewsList.aspx`
+- `https://www.sharesansar.com/news-page`
 
-The app auto-seeds six NEPSE companies on crawl/analysis execution:
+### Market Data
+
+- `https://www.sharesansar.com/company/{symbol}`
+- ShareSansar price history endpoint
+- ShareSansar floorsheet endpoint
+
+## Seeded Watchlist
+
+The current watchlist is seeded from [data/seed/companies.json](data/seed/companies.json) and contains six companies across multiple sectors:
 
 - `NABIL`
 - `NTC`
@@ -43,6 +71,121 @@ The app auto-seeds six NEPSE companies on crawl/analysis execution:
 - `UPPER`
 - `SICL`
 - `CHCL`
+
+The assignment requested 5-10 companies. This repository currently uses 6 companies, which stays inside that range.
+
+## Categorization Approach
+
+The categorization engine is implemented as a rule-based watchlist matcher:
+
+1. Normalize article title and body text.
+2. Build a term set from each tracked company's symbol, name, and aliases.
+3. Count exact symbol/alias hits in the title and body.
+4. Compute a confidence score from:
+   - alias hit count
+   - symbol hit count
+   - title hit count
+   - distinct matched terms
+   - article body length
+5. Persist every matched company as a separate tag to support multi-label tagging.
+
+Key files:
+
+- matcher: [`backend/app/categorization/entity_matcher.py`](backend/app/categorization/entity_matcher.py)
+- confidence scoring: [`backend/app/categorization/confidence.py`](backend/app/categorization/confidence.py)
+- orchestration: [`backend/app/services/categorization_service.py`](backend/app/services/categorization_service.py)
+
+### Why This Approach
+
+- It is transparent and easy to reason about under time pressure.
+- It supports multi-label tagging cleanly.
+- It produces deterministic confidence scores that are easy to review.
+- It integrates well with a manual review queue.
+
+### Trade-Offs
+
+- It is weaker than NER, embeddings, or LLM classification for indirect references and ambiguous phrasing.
+- It depends heavily on alias quality in the watchlist.
+- It tends to produce conservative results, which is why the manual review path is important.
+
+## Behavior Analysis Outputs
+
+Daily analysis snapshots are materialized and stored rather than recomputed on every request.
+
+The current analysis pipeline computes:
+
+- close price and VWAP
+- daily price and volume change percentages
+- pressure indicator from price and volume movement
+- anomaly thresholds using a rolling average multiplied by `1.8`
+- anomaly flags when daily volume crosses that threshold
+- same-day tagged news count and sentiment score
+- next-day price and volume change references
+- net broker positions from floorsheet rows when present
+
+Key files:
+
+- pipeline: [`backend/app/services/analysis_service.py`](backend/app/services/analysis_service.py)
+- pressure: [`backend/app/analysis/pressure.py`](backend/app/analysis/pressure.py)
+- VWAP helper: [`backend/app/analysis/price_metrics.py`](backend/app/analysis/price_metrics.py)
+- broker aggregation: [`backend/app/analysis/broker_analysis.py`](backend/app/analysis/broker_analysis.py)
+
+The written findings summary required by the assignment is in [docs/findings-summary.md](docs/findings-summary.md).
+
+## Architecture Overview
+
+### Backend
+
+- Framework: FastAPI
+- DB access: SQLAlchemy
+- Migrations: Alembic
+- Queue/scheduler: Celery + Redis
+- DB: PostgreSQL
+
+### Frontend
+
+- Framework: Next.js 15 + React 19 + TypeScript
+- Auth model: browser-stored JWT demo session
+- Main surfaces:
+  - watchlist dashboard
+  - company board with chart and broker analysis
+  - manual review desk
+  - operations/admin console
+
+### System Flow
+
+1. Crawl news and market data into PostgreSQL.
+2. Categorize articles against the watchlist.
+3. Compute analysis snapshots from stored prices, tags, and floorsheet rows.
+4. Expose those results via FastAPI endpoints.
+5. Read those endpoints from the Next.js dashboard.
+
+For a guided code walkthrough, see [docs/codebase-guide.md](docs/codebase-guide.md).
+
+## API Surface
+
+Implemented primary endpoints include:
+
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `GET /api/companies`
+- `GET /api/companies/:id`
+- `GET /api/companies/:id/prices?range=30d`
+- `GET /api/companies/:id/floorsheet?date=`
+- `GET /api/companies/:id/behavior-summary`
+- `GET /api/companies/:id/news-price-correlation`
+- `GET /api/news?company_id=`
+- `GET /api/news/review-queue`
+- `POST /api/news/:id/recategorize`
+- `POST /api/admin/crawl-runs`
+- `GET /api/admin/crawl-runs`
+- `GET /api/admin/crawl-runs/:id`
+- `GET /api/admin/users`
+- `POST /api/admin/users`
+
+OpenAPI is available at:
+
+- `http://localhost:8000/docs`
 
 ## Local Run
 
@@ -58,20 +201,20 @@ cp .env.example .env
 docker compose up --build
 ```
 
-3. Run the database migration:
+3. If you want to apply migrations manually, run:
 
 ```bash
 docker compose exec backend alembic upgrade head
 ```
+
+Note: the backend also attempts to run migrations on startup.
 
 4. Open the app:
 
 - Frontend: `http://localhost:3000`
 - Backend docs: `http://localhost:8000/docs`
 
-## Default Admin
-
-Bootstrapped local admin credentials:
+## Default Admin Credentials
 
 - Email: `admin@example.com`
 - Password: `admin123`
@@ -80,14 +223,52 @@ These can be overridden with `BOOTSTRAP_ADMIN_*` values in `.env`.
 
 ## Recommended Demo Flow
 
-1. Sign in from `/login`
-2. Open `/admin`
-3. Trigger a `full` crawl with `execute inline now` enabled
-4. Open `/dashboard`
-5. Drill into a company detail page
-6. Open `/review` and manually correct any low-confidence article
+1. Sign in from `/login`.
+2. Open `/admin`.
+3. Trigger a `full` crawl with inline execution enabled.
+4. Open `/dashboard`.
+5. Open any company board from the watchlist.
+6. Inspect:
+   - 30 day trend chart
+   - recent tagged news
+   - behavior summary
+   - buyer/seller analysis
+7. Open `/review` and manually correct a low-confidence article.
+
+## Verification Completed
+
+Verified on **August 4, 2026**:
+
+- backend tests: `18 passed`
+- frontend production build: `docker compose run --rm --no-deps frontend npm run build`
+- live crawl verification:
+  - `6` companies seeded
+  - `180` daily price rows created
+  - `24` news articles stored
+  - `1` auto-tagged article
+  - `23` review-queue candidates
+
+## Time-Boxed Assumptions And Shortcuts
+
+- Categorization is rule-based rather than embedding-based or LLM-based.
+- The tracked watchlist is seeded from JSON rather than fully admin-managed through CRUD screens.
+- Analyst export/report download endpoints are not implemented yet.
+- Broker analysis depends on live floorsheet availability from the source site. The code path exists, tests cover it, and the UI supports it, but some live runs may return zero floorsheet rows.
+- Local `docker compose` execution is the primary delivery path. No public deployment URL is included in this repository.
 
 ## Useful Commands
+
+Run backend tests:
+
+```bash
+python3 -m pytest backend/tests -q
+```
+
+Run a frontend production build:
+
+```bash
+docker compose run --rm --no-deps frontend npm run build
+```
 
 Start only the worker locally:
 
@@ -101,22 +282,7 @@ Start only beat locally:
 make beat
 ```
 
-Run backend tests:
+## Additional Docs
 
-```bash
-python3 -m pytest backend/tests -q
-```
-
-## Verification Completed
-
-Verified on August 4, 2026:
-
-- Backend tests: `16 passed`
-- Backend compile pass: `python3 -m compileall backend/app`
-- Frontend production build: `docker compose run --rm --no-deps frontend npm run build`
-
-## Notes On Scope
-
-- Categorization is intentionally rule-based rather than ML-heavy to keep the end-to-end product working and reviewable within the assignment timebox.
-- The frontend is focused on a functional demo workflow rather than chart-heavy polish.
-- Market-data crawling currently uses ShareSansar as the live source for OHLCV and floorsheet sampling.
+- findings summary: [docs/findings-summary.md](docs/findings-summary.md)
+- codebase guide: [docs/codebase-guide.md](docs/codebase-guide.md)

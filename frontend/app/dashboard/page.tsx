@@ -108,11 +108,19 @@ export default function DashboardPage() {
   const totalTaggedNews = cards.reduce((total, { summary }) => total + summary.news_count, 0);
   const focusCompany = [...cards].sort((left, right) => right.summary.news_count - left.summary.news_count)[0] ?? null;
   const pressureSignals = cards.filter(({ summary }) => summary.pressure_indicator).length;
+  const largestMover =
+    [...cards]
+      .map(({ company, summary }) => ({
+        company,
+        change: parseNumericValue(summary.price_change_pct),
+      }))
+      .filter((entry) => Number.isFinite(entry.change))
+      .sort((left, right) => Math.abs(right.change) - Math.abs(left.change))[0] ?? null;
 
   return (
     <LayoutShell
-      title="Cross-Company Watchlist"
-      description="Dense market workspace for scanning the seeded NEPSE watchlist across price pressure, tagged headlines, anomalies, and review workload."
+      title="Cross-Company Dashboard"
+      description="Compare the tracked NEPSE watchlist across closing price, VWAP, tagged news volume, pressure signals, and anomaly flags."
     >
       <div className="toolbar">
         <div className="badge">
@@ -137,25 +145,31 @@ export default function DashboardPage() {
             <div className="kpi">
               <div className="kpi__label">Tracked Companies</div>
               <div className="kpi__value">{cards.length}</div>
-              <div className="kpi__note">All seeded watchlist companies currently available in the protected dashboard.</div>
+              <div className="kpi__note">All seeded companies currently loaded into the protected cross-company view.</div>
             </div>
             <div className="kpi">
-              <div className="kpi__label">Tagged News</div>
-              <div className="kpi__value">{totalTaggedNews}</div>
+              <div className="kpi__label">Most In News</div>
+              <div className="kpi__value">{focusCompany?.company.symbol ?? "N/A"}</div>
               <div className="kpi__note">Aggregate article references mapped across the latest company snapshots.</div>
             </div>
             <div className="kpi">
-              <div className="kpi__label">Volume Flags</div>
-              <div className="kpi__value">{anomalyCount}</div>
-              <div className="kpi__note">Companies currently marked with a detected volume anomaly in the snapshot.</div>
+              <div className="kpi__label">Largest Price Move</div>
+              <div className="kpi__value">
+                {largestMover ? `${largestMover.change > 0 ? "+" : ""}${largestMover.change.toFixed(2)}%` : "N/A"}
+              </div>
+              <div className="kpi__note">
+                {largestMover
+                  ? `${largestMover.company.symbol} has the biggest absolute price move in the latest snapshot.`
+                  : "Run a crawl to populate price movement across the tracked watchlist."}
+              </div>
             </div>
             <div className="kpi">
-              <div className="kpi__label">Focus Name</div>
-              <div className="kpi__value">{focusCompany?.company.symbol ?? "N/A"}</div>
+              <div className="kpi__label">Volume Anomalies</div>
+              <div className="kpi__value">{anomalyCount}</div>
               <div className="kpi__note">
                 {focusCompany
                   ? `${focusCompany.summary.news_count} tagged stories make ${focusCompany.company.name} the current headline focus.`
-                  : "Run a crawl to populate the watchlist and recent news focus."}
+                  : "Run a crawl to populate the dashboard and detect unusual trading activity."}
               </div>
             </div>
           </div>
@@ -164,9 +178,9 @@ export default function DashboardPage() {
             {cards.map(({ company, summary }) => (
               <SectionCard
                 key={company.id}
-                eyebrow="Watchlist"
+                eyebrow="Company"
                 title={`${company.symbol} · ${company.sector}`}
-                aside={<span className="badge">{summary.news_count} news</span>}
+                aside={<span className="badge">{summary.news_count} tagged news</span>}
               >
                 <div className="metric">
                   {summary.close_price ? `Rs. ${summary.close_price}` : "No close price"}
@@ -181,22 +195,26 @@ export default function DashboardPage() {
                   <strong>{summary.pressure_indicator ?? "pending"}</strong>
                 </div>
                 <div className="stat-row">
-                  <span>News Count</span>
-                  <strong>{summary.news_count}</strong>
+                  <span>Price Change %</span>
+                  <strong>{summary.price_change_pct ?? "N/A"}</strong>
+                </div>
+                <div className="stat-row">
+                  <span>Volume Change %</span>
+                  <strong>{summary.volume_change_pct ?? "N/A"}</strong>
                 </div>
                 <div className="stat-row">
                   <span>Volume Anomaly</span>
                   <strong>{summary.is_volume_anomaly ? "Yes" : "No"}</strong>
                 </div>
                 <Link className="button" href={`/companies/${company.id}`}>
-                  Open Company Board
+                  View Analysis
                 </Link>
               </SectionCard>
             ))}
           </div>
 
           <div className="grid grid--two">
-            <SectionCard eyebrow="Feed" title="Recent Tagged News" aside={<span className="badge">{newsItems.length} items</span>}>
+            <SectionCard eyebrow="Feed" title="Latest Tagged Headlines" aside={<span className="badge">{newsItems.length} loaded</span>}>
               {newsItems.length === 0 ? (
                 <p>No crawled news is stored yet. Trigger a crawl from the admin page.</p>
               ) : (
@@ -207,7 +225,9 @@ export default function DashboardPage() {
                         <span>{article.source_name}</span>
                         <span>{formatDate(article.published_at)}</span>
                       </div>
-                      <strong>{article.headline}</strong>
+                      <a href={article.source_url} rel="noreferrer" target="_blank">
+                        <strong>{article.headline}</strong>
+                      </a>
                       <p>{article.excerpt ?? "No excerpt available."}</p>
                       <div className="tag-row">
                         {article.tags.map((tag) => (
@@ -222,28 +242,36 @@ export default function DashboardPage() {
               )}
             </SectionCard>
 
-            <SectionCard eyebrow="Status" title="Operational Summary" aside={<span className="badge">{pressureSignals} signals</span>}>
+            <SectionCard eyebrow="Comparison" title="Cross-Company Leaders" aside={<span className="badge">{totalTaggedNews} total tags</span>}>
               <div className="stat-row">
-                <span>Tracked Companies</span>
-                <strong>{cards.length}</strong>
+                <span>Most In News</span>
+                <strong>{focusCompany ? `${focusCompany.company.symbol} (${focusCompany.summary.news_count})` : "N/A"}</strong>
               </div>
               <div className="stat-row">
-                <span>Latest News Loaded</span>
-                <strong>{newsItems.length}</strong>
+                <span>Largest Price Move</span>
+                <strong>
+                  {largestMover
+                    ? `${largestMover.company.symbol} (${largestMover.change > 0 ? "+" : ""}${largestMover.change.toFixed(2)}%)`
+                    : "N/A"}
+                </strong>
               </div>
-              {reviewQueueCount !== null ? (
-                <div className="stat-row">
-                  <span>Needs Review</span>
-                  <strong>{reviewQueueCount}</strong>
-                </div>
-              ) : null}
               <div className="stat-row">
                 <span>Pressure Signals</span>
                 <strong>{pressureSignals}</strong>
               </div>
+              <div className="stat-row">
+                <span>Volume Anomalies</span>
+                <strong>{anomalyCount}</strong>
+              </div>
+              {reviewQueueCount !== null ? (
+                <div className="stat-row">
+                  <span>Review Queue</span>
+                  <strong>{reviewQueueCount}</strong>
+                </div>
+              ) : null}
               <p className="muted">
-                Use the review desk for low-confidence tags and the ops console to trigger fresh crawls inline or
-                through Celery.
+                Use the company pages to inspect charts and floorsheet flow, the review page for low-confidence tags,
+                and the admin page to trigger fresh crawl runs.
               </p>
             </SectionCard>
           </div>
@@ -258,4 +286,12 @@ function formatDate(value: string | null): string {
     return "Unknown";
   }
   return new Date(value).toLocaleString();
+}
+
+function parseNumericValue(value: string | null): number {
+  if (!value) {
+    return Number.NaN;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
 }

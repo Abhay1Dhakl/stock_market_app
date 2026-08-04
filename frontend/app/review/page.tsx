@@ -97,7 +97,7 @@ export default function ReviewPage() {
     return (
       <LayoutShell
         title="Review Queue"
-        description="Analyst/admin access is required before this page can load low-confidence or uncategorized news items."
+        description="Analyst or admin access is required before this page can load low-confidence or untagged news items."
       >
         <SectionCard title="Session Required">
           <p>Login as an analyst or admin and return here.</p>
@@ -113,8 +113,8 @@ export default function ReviewPage() {
 
   return (
     <LayoutShell
-      title="Manual Review Desk"
-      description="Analyst workspace for low-confidence or uncategorized articles where human corrections override future automated tagging."
+      title="Categorization Review Queue"
+      description="Review low-confidence or untagged articles, correct company associations, and persist analyst-approved categorizations."
     >
       {loading ? (
         <SectionCard title="Loading">
@@ -140,82 +140,87 @@ export default function ReviewPage() {
             <>
               <div className="kpi-strip">
                 <div className="kpi">
-                  <div className="kpi__label">Articles In Queue</div>
+                  <div className="kpi__label">Articles Pending</div>
                   <div className="kpi__value">{articles.length}</div>
-                  <div className="kpi__note">Low-confidence or uncategorized headlines that still need an analyst decision.</div>
+                  <div className="kpi__note">Low-confidence or untagged headlines that still need an analyst decision.</div>
                 </div>
                 <div className="kpi">
-                  <div className="kpi__label">Suggested Links</div>
+                  <div className="kpi__label">Selected Links</div>
                   <div className="kpi__value">{suggestedLinks}</div>
-                  <div className="kpi__note">Current company selections across all queued articles before any manual changes.</div>
+                  <div className="kpi__note">Company associations currently selected across the loaded review set.</div>
                 </div>
                 <div className="kpi">
-                  <div className="kpi__label">Workspace Role</div>
+                  <div className="kpi__label">Signed-In Role</div>
                   <div className="kpi__value">{session.user.role}</div>
-                  <div className="kpi__note">Only analysts and admins should operate from this manual review surface.</div>
+                  <div className="kpi__note">Corrections are stored server-side and replace the automatic company label set.</div>
                 </div>
               </div>
 
               <div className="stack">
-              {articles.map((article) => (
-                <SectionCard
-                  key={article.id}
-                  eyebrow={article.source_name}
-                  title={article.headline}
-                  aside={<span className="badge">{article.tags.length ? `${article.tags.length} tags` : "untagged"}</span>}
-                >
-                  <div className="list-card__meta">
-                    <span>{article.source_name}</span>
-                    <span>{formatDate(article.published_at)}</span>
-                    <span>Sentiment: {article.sentiment_label ?? "neutral"}</span>
-                  </div>
-                  <p>{article.excerpt ?? "No excerpt available."}</p>
-                  <div className="tag-row">
-                    {article.tags.length ? (
-                      article.tags.map((tag) => (
-                        <span key={`${article.id}-${tag.company_id}`} className="badge">
-                          {tag.symbol} · {tag.confidence_score} · {tag.tag_source}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="badge">No tags yet</span>
-                    )}
-                  </div>
+                {articles.map((article) => (
+                  <SectionCard
+                    key={article.id}
+                    eyebrow={article.source_name}
+                    title={article.headline}
+                    aside={<span className="badge">{article.tags.length ? `${article.tags.length} tags` : "untagged"}</span>}
+                  >
+                    <div className="list-card__meta">
+                      <span>{article.source_name}</span>
+                      <span>{formatDate(article.published_at)}</span>
+                      <span>Sentiment: {article.sentiment_label ?? "neutral"}</span>
+                    </div>
+                    <p>
+                      <a href={article.source_url} rel="noreferrer" target="_blank">
+                        Open source article
+                      </a>
+                    </p>
+                    <p>{article.excerpt ?? "No excerpt available."}</p>
+                    <div className="tag-row">
+                      {article.tags.length ? (
+                        article.tags.map((tag) => (
+                          <span key={`${article.id}-${tag.company_id}`} className="badge">
+                            {tag.symbol} · {tag.confidence_score} · {tag.tag_source}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="badge">No tags yet</span>
+                      )}
+                    </div>
 
-                  <div className="checkbox-grid">
-                    {companies.map((company) => (
-                      <label key={company.id} className="checkbox">
-                        <input
-                          checked={(selectedCompanyIds[article.id] ?? []).includes(company.id)}
-                          onChange={() => toggleCompany(article.id, company.id)}
-                          type="checkbox"
-                        />
-                        <span>
-                          {company.symbol} · {company.name}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
+                    <div className="checkbox-grid">
+                      {companies.map((company) => (
+                        <label key={company.id} className="checkbox">
+                          <input
+                            checked={(selectedCompanyIds[article.id] ?? []).includes(company.id)}
+                            onChange={() => toggleCompany(article.id, company.id)}
+                            type="checkbox"
+                          />
+                          <span>
+                            {company.symbol} · {company.name}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
 
-                  <label className="field">
-                    <span>Reviewer Notes</span>
-                    <textarea
-                      rows={3}
-                      value={notes[article.id] ?? ""}
-                      onChange={(event) =>
-                        setNotes((current) => ({
-                          ...current,
-                          [article.id]: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
+                    <label className="field">
+                      <span>Reviewer Notes</span>
+                      <textarea
+                        rows={3}
+                        value={notes[article.id] ?? ""}
+                        onChange={(event) =>
+                          setNotes((current) => ({
+                            ...current,
+                            [article.id]: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
 
-                  <button className="button" onClick={() => submitReview(article.id)} type="button">
-                    Save Correction
-                  </button>
-                </SectionCard>
-              ))}
+                    <button className="button" onClick={() => submitReview(article.id)} type="button">
+                      Save Correction
+                    </button>
+                  </SectionCard>
+                ))}
               </div>
             </>
           )}

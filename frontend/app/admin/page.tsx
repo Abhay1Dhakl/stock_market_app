@@ -127,7 +127,7 @@ export default function AdminPage() {
   if (!session) {
     return (
       <LayoutShell
-        title="Ops Console"
+        title="Administration"
         description="Admin access is required before this page can manage crawl runs, user creation, and operational metadata."
       >
         <SectionCard eyebrow="Access" title="Session Required">
@@ -141,12 +141,12 @@ export default function AdminPage() {
   }
 
   const activeUsers = users.filter((user) => user.is_active).length;
-  const completedRuns = crawlRuns.filter((run) => run.status === "completed").length;
+  const succeededRuns = crawlRuns.filter((run) => run.status === "succeeded").length;
 
   return (
     <LayoutShell
-      title="Operations Console"
-      description="Admin workspace for crawl execution, role provisioning, and quick inspection of the pipeline state exposed by the backend."
+      title="Administration"
+      description="Trigger crawl jobs, inspect recent run history, and provision role-based users from the protected admin API."
     >
       {loading ? (
         <SectionCard eyebrow="Status" title="Loading">
@@ -166,9 +166,9 @@ export default function AdminPage() {
 
           <div className="kpi-strip">
             <div className="kpi">
-              <div className="kpi__label">Known Users</div>
+              <div className="kpi__label">Provisioned Users</div>
               <div className="kpi__value">{users.length}</div>
-              <div className="kpi__note">Accounts provisioned through bootstrap and the in-app admin user creator.</div>
+              <div className="kpi__note">Accounts created through bootstrap and the protected admin user creation flow.</div>
             </div>
             <div className="kpi">
               <div className="kpi__label">Active Users</div>
@@ -181,14 +181,14 @@ export default function AdminPage() {
               <div className="kpi__note">The latest crawl executions loaded from the protected admin API.</div>
             </div>
             <div className="kpi">
-              <div className="kpi__label">Completed Runs</div>
-              <div className="kpi__value">{completedRuns}</div>
-              <div className="kpi__note">Finished runs let you confirm whether the ingestion and analysis loop is healthy.</div>
+              <div className="kpi__label">Succeeded Runs</div>
+              <div className="kpi__value">{succeededRuns}</div>
+              <div className="kpi__note">Successful runs confirm that crawling, tagging, and analysis completed without failure.</div>
             </div>
           </div>
 
           <div className="grid grid--two">
-            <SectionCard eyebrow="Crawlers" title="Trigger Crawl" aside={<span className="badge">{runKind}</span>}>
+            <SectionCard eyebrow="Crawlers" title="Run Crawl Pipeline" aside={<span className="badge">{runKind}</span>}>
               <div className="form">
                 <label className="field">
                   <span>Run Kind</span>
@@ -217,16 +217,16 @@ export default function AdminPage() {
 
                 <label className="checkbox">
                   <input checked={executeNow} onChange={() => setExecuteNow((current) => !current)} type="checkbox" />
-                  <span>Execute inline now instead of only enqueueing</span>
+                  <span>Execute immediately in the API process instead of queue-only mode</span>
                 </label>
 
                 <button className="button" disabled={submitting} onClick={triggerCrawl} type="button">
-                  {submitting ? "Running..." : "Start Crawl"}
+                  {submitting ? "Running..." : "Start Crawl Run"}
                 </button>
               </div>
             </SectionCard>
 
-            <SectionCard eyebrow="Users" title="Create User" aside={<span className="badge">{newUserRole}</span>}>
+            <SectionCard eyebrow="Users" title="Create Platform User" aside={<span className="badge">{newUserRole}</span>}>
               <div className="form">
                 <label className="field">
                   <span>Full Name</span>
@@ -285,7 +285,7 @@ export default function AdminPage() {
           </div>
 
           <div className="grid grid--two">
-            <SectionCard eyebrow="Directory" title="Current Users" aside={<span className="badge">{users.length} total</span>}>
+            <SectionCard eyebrow="Directory" title="User Directory" aside={<span className="badge">{users.length} total</span>}>
               <div className="table-wrap">
                 <table className="table">
                   <thead>
@@ -310,7 +310,7 @@ export default function AdminPage() {
               </div>
             </SectionCard>
 
-            <SectionCard eyebrow="Runs" title="Recent Crawl Runs" aside={<span className="badge">{crawlRuns.length} loaded</span>}>
+            <SectionCard eyebrow="Runs" title="Run History" aside={<span className="badge">{crawlRuns.length} loaded</span>}>
               <div className="table-wrap">
                 <table className="table">
                   <thead>

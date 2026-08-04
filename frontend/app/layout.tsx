@@ -16,8 +16,8 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Stock Market Application",
-  description: "Assignment dashboard for crawling, categorization, and market behavior analysis.",
+  title: "NEPSE Stock Intelligence",
+  description: "Role-based NEPSE market dashboard for crawling news, tagging companies, and analyzing trading behavior.",
 };
 
 export default function RootLayout({

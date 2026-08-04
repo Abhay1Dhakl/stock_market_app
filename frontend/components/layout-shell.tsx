@@ -8,30 +8,30 @@ type LayoutShellProps = {
 };
 
 const navItems = [
-  { href: "/", label: "Console" },
-  { href: "/dashboard", label: "Watchlist" },
-  { href: "/review", label: "Review Desk" },
-  { href: "/admin", label: "Ops" },
-  { href: "/login", label: "Access" },
+  { href: "/", label: "Overview" },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/review", label: "Review" },
+  { href: "/admin", label: "Admin" },
+  { href: "/login", label: "Sign In" },
 ];
 
-const tickerItems = ["News", "Prices", "Floorsheet", "Signals", "RBAC"];
+const tickerItems = ["News Crawlers", "30D Prices", "Floorsheet", "Categorization", "RBAC"];
 
 const workspaceStats = [
   {
-    label: "Coverage",
+    label: "News Sources",
     value: "02",
-    note: "Live crawlers connected for MeroLagani and ShareSansar.",
+    note: "ShareSansar and MeroLagani are used for the current news and market data pipeline.",
   },
   {
-    label: "Roles",
+    label: "Seeded Names",
+    value: "06",
+    note: "The current watchlist ships with six seeded NEPSE companies across multiple sectors.",
+  },
+  {
+    label: "Protected Roles",
     value: "03",
-    note: "Viewer, analyst, and admin flows map cleanly to the backend guards.",
-  },
-  {
-    label: "Loop",
-    value: "24/7",
-    note: "Crawl, tag, review, analyze, and expose the results in one workspace.",
+    note: "Admin, analyst, and viewer permissions are enforced by the backend on every route.",
   },
 ];
 
@@ -43,7 +43,7 @@ export function LayoutShell({ title, description, children }: LayoutShellProps) 
           <div className="shell__topline">
             <div className="shell__terminal">
               <span aria-hidden className="shell__terminal-dot" />
-              <span>NEPSE Market Console</span>
+              <span>NEPSE Stock Intelligence</span>
             </div>
             <div className="shell__ticker" aria-label="Workspace capabilities">
               {tickerItems.map((item) => (
@@ -56,22 +56,22 @@ export function LayoutShell({ title, description, children }: LayoutShellProps) 
 
           <div className="shell__hero">
             <div className="shell__hero-main">
-              <div className="shell__eyebrow">Stock Market Intelligence</div>
+              <div className="shell__eyebrow">NEPSE Market Platform</div>
               <h1 className="shell__title">{title}</h1>
               <p className="shell__description">{description}</p>
               <div className="shell__meta">
-                <span className="signal-pill signal-pill--accent">Protected Workspace</span>
-                <span className="signal-pill">News + Market Data</span>
-                <span className="signal-pill">Manual Review Loop</span>
+                <span className="signal-pill signal-pill--accent">JWT + RBAC</span>
+                <span className="signal-pill">News + OHLCV</span>
+                <span className="signal-pill">Manual Recategorization</span>
               </div>
             </div>
 
             <aside className="shell__hero-side">
               <div className="shell__brief">
-                <div className="card__eyebrow">Workspace Brief</div>
+                <div className="card__eyebrow">System Summary</div>
                 <p className="shell__brief-copy">
-                  Terminal-inspired layout for scanning company movement, headline pressure, and operational state
-                  without leaving the app.
+                  FastAPI and Next.js application for crawling NEPSE market news, tagging tracked companies, storing
+                  30-day market data, and exposing analysis through protected review and administration screens.
                 </p>
                 <div className="shell__status-grid">
                   {workspaceStats.map((item) => (

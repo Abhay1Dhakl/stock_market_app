@@ -44,11 +44,11 @@ export default function LoginPage() {
 
   return (
     <LayoutShell
-      title="Operator Access"
-      description="Use the backend JWT endpoint to unlock the watchlist, review desk, and ops console from a single browser session."
+      title="Sign In"
+      description="Authenticate against the backend to open the dashboard, review queue, and administration pages."
     >
       <div className="grid grid--two">
-        <SectionCard eyebrow="Auth" title="Sign In To The Workspace" aside={<span className="badge">JWT Session</span>}>
+        <SectionCard eyebrow="Authentication" title="Open A Protected Session" aside={<span className="badge">JWT</span>}>
           <form className="form" onSubmit={handleSubmit}>
             <label className="field">
               <span>Email</span>
@@ -65,7 +65,7 @@ export default function LoginPage() {
           </form>
         </SectionCard>
 
-        <SectionCard eyebrow="Session" title="Access Briefing">
+        <SectionCard eyebrow="Session" title="Session Details">
           {session ? (
             <>
               <p>
@@ -79,9 +79,9 @@ export default function LoginPage() {
                 <span>Email</span>
                 <strong>{session.user.email}</strong>
               </div>
-              <p className="muted">The access token is stored in local browser storage for this demo UI.</p>
+              <p className="muted">The access token is stored in local browser storage by this frontend client.</p>
               <Link className="button" href="/dashboard">
-                Open Watchlist
+                Open Dashboard
               </Link>
             </>
           ) : (
@@ -95,9 +95,7 @@ export default function LoginPage() {
                 <span>Default Password</span>
                 <strong>admin123</strong>
               </div>
-              <p className="muted">
-                The form is prefilled with the bootstrapped admin account created by the backend bootstrap step.
-              </p>
+              <p className="muted">The form is prefilled with the administrator account created during backend bootstrap.</p>
             </>
           )}
         </SectionCard>

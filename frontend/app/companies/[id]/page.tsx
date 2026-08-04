@@ -95,8 +95,8 @@ export default function CompanyDetailPage() {
   if (!session) {
     return (
       <LayoutShell
-        title="Company Detail"
-        description="A stored session is required before this page can call protected company and analysis endpoints."
+        title="Company Analysis"
+        description="A stored session is required before this page can call protected company, news, and analysis endpoints."
       >
         <SectionCard title="Session Required">
           <p>Login first, then return to the dashboard and open a company from there.</p>
@@ -134,8 +134,8 @@ export default function CompanyDetailPage() {
 
   return (
     <LayoutShell
-      title={company ? `${company.symbol} Focus Board` : `Company ${companyId}`}
-      description="Single-company workspace combining price action, tagged headlines, broker activity, and correlation outputs for one tracked name."
+      title={company ? `${company.symbol} Company Analysis` : `Company ${companyId}`}
+      description="30-day price history, tagged news, floorsheet activity, and derived behavior signals for a tracked NEPSE company."
     >
       {loading ? (
         <SectionCard title="Loading">
@@ -171,12 +171,12 @@ export default function CompanyDetailPage() {
           </div>
 
           <div className="grid grid--three">
-            <SectionCard eyebrow="Profile" title="Company">
+            <SectionCard eyebrow="Profile" title="Company Profile">
               <div className="metric">{company.symbol}</div>
               <p>{company.name}</p>
               <p className="muted">{company.sector}</p>
             </SectionCard>
-            <SectionCard eyebrow="Snapshot" title="Behavior Snapshot">
+            <SectionCard eyebrow="Snapshot" title="Price & Signal Summary">
               <div className="stat-row">
                 <span>Close Price</span>
                 <strong>{summary.close_price ? `Rs. ${summary.close_price}` : "N/A"}</strong>
@@ -198,7 +198,7 @@ export default function CompanyDetailPage() {
                 <strong>{summary.volume_change_pct ?? "N/A"}</strong>
               </div>
             </SectionCard>
-            <SectionCard eyebrow="Floorsheet" title="Broker Signal">
+            <SectionCard eyebrow="Floorsheet" title="Broker Snapshot">
               {summary.snapshot_payload.top_brokers?.length ? (
                 <div className="stack">
                   {summary.snapshot_payload.top_brokers.map((broker) => (
@@ -219,7 +219,7 @@ export default function CompanyDetailPage() {
           </div>
 
           <div className="grid grid--two">
-            <SectionCard eyebrow="Price Action" title="30 Day Trend" aside={<span className="badge">{priceSeries.length} sessions</span>}>
+            <SectionCard eyebrow="Price Action" title="30-Day Price Trend" aside={<span className="badge">{priceSeries.length} sessions</span>}>
               <PriceTrendChart points={priceSeries} />
               <div className="grid grid--two">
                 <div className="stat-row">
@@ -365,7 +365,7 @@ export default function CompanyDetailPage() {
               </div>
             </SectionCard>
 
-            <SectionCard eyebrow="News Feed" title="Recent Tagged News" aside={<span className="badge">{newsItems.length} items</span>}>
+            <SectionCard eyebrow="News Feed" title="Company News Feed" aside={<span className="badge">{newsItems.length} items</span>}>
               {newsItems.length === 0 ? (
                 <p>No tagged articles are stored for this company yet.</p>
               ) : (
@@ -388,7 +388,7 @@ export default function CompanyDetailPage() {
           </div>
 
           <div className="grid grid--two">
-            <SectionCard eyebrow="Execution Tape" title="Floorsheet Sample">
+            <SectionCard eyebrow="Execution Tape" title="Floorsheet Transactions">
               <div className="table-wrap">
                 <table className="table">
                   <thead>
@@ -417,7 +417,7 @@ export default function CompanyDetailPage() {
               </div>
             </SectionCard>
 
-            <SectionCard eyebrow="Analysis" title="News / Price Correlation">
+            <SectionCard eyebrow="Analysis" title="News Impact Correlation">
               <div className="table-wrap">
                 <table className="table">
                   <thead>
