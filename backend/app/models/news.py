@@ -41,6 +41,7 @@ class NewsArticle(Base, TimestampMixin):
         back_populates="news_article",
         cascade="all, delete-orphan",
     )
+    behavior_events: Mapped[list["UserBehaviorEvent"]] = relationship(back_populates="article")
 
 
 class NewsCompanyTag(Base, TimestampMixin):

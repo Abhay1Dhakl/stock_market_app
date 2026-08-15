@@ -1,4 +1,5 @@
 from app.schemas.admin import (
+    AdminUserBehaviorResponse,
     CrawlRunListResponse,
     CrawlRunRequest,
     CrawlRunResponse,
@@ -8,6 +9,7 @@ from app.schemas.admin import (
 )
 from app.schemas.analysis import BehaviorSummaryResponse, NewsPriceCorrelationResponse
 from app.schemas.auth import LoginRequest, TokenResponse, UserProfile
+from app.schemas.behavior import TelemetryEventRequest, TelemetryEventResponse, UserBehaviorSummaryResponse
 from app.schemas.company import (
     CompanyFloorsheetResponse,
     CompanyListResponse,
@@ -15,6 +17,7 @@ from app.schemas.company import (
     CompanySummary,
 )
 from app.schemas.news import NewsArticleSummary, NewsListResponse, NewsRecategorizeResponse, RecategorizeRequest
+from app.schemas.watchlist import DiscoveryFeedResponse, UserWatchlistResponse, WatchlistMutationRequest
 
 __all__ = [
     "LoginRequest",
@@ -30,10 +33,17 @@ __all__ = [
     "NewsRecategorizeResponse",
     "BehaviorSummaryResponse",
     "NewsPriceCorrelationResponse",
+    "UserBehaviorSummaryResponse",
+    "TelemetryEventRequest",
+    "TelemetryEventResponse",
     "CrawlRunRequest",
     "CrawlRunListResponse",
     "CrawlRunResponse",
+    "AdminUserBehaviorResponse",
     "UserCreateRequest",
     "UserSummaryResponse",
     "UserListResponse",
+    "WatchlistMutationRequest",
+    "UserWatchlistResponse",
+    "DiscoveryFeedResponse",
 ]

@@ -8,6 +8,7 @@ from app.core.permissions import get_current_user
 from app.models.user import User
 from app.schemas.auth import LoginRequest, TokenResponse, UserProfile
 from app.services.auth_service import authenticate_user, build_token_response
+from app.services.user_behavior_service import record_user_event
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -25,6 +26,7 @@ async def login(payload: LoginRequest, db: Session = Depends(get_db_session)) ->
     db.add(user)
     db.commit()
     db.refresh(user)
+    record_user_event(db, user_id=user.id, event_type="login", page_path="/login")
     return build_token_response(user)
 
 

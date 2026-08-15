@@ -9,6 +9,7 @@ from app.repositories.company_repository import get_company_by_id, get_company_b
 from app.models.user import User
 from app.repositories.admin_repository import create_crawl_run, get_crawl_run_by_id, list_crawl_runs
 from app.repositories.user_repository import get_role_by_name, get_user_by_email, list_users
+from app.schemas.behavior import AdminUserBehaviorResponse
 from app.schemas.admin import (
     CrawlRunListResponse,
     CrawlRunRequest,
@@ -19,6 +20,7 @@ from app.schemas.admin import (
 )
 from app.schemas.company import CompanyCreateRequest, CompanyListResponse, CompanySummary, CompanyUpdateRequest
 from app.services.crawl_service import execute_crawl_run
+from app.services.user_behavior_service import build_admin_user_behavior_overview, record_user_event
 from app.tasks.crawl_tasks import run_crawl_pipeline
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -65,6 +67,14 @@ async def trigger_crawl_run(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Unable to enqueue crawl run. Ensure Redis and the Celery worker are running.",
             ) from exc
+
+    record_user_event(
+        db,
+        user_id=user.id,
+        event_type="crawl_triggered",
+        page_path="/admin",
+        metadata={"run_kind": payload.run_kind, "sources": payload.sources, "execute_now": execute_now},
+    )
 
     return CrawlRunResponse(
         id=crawl_run.id,
@@ -138,6 +148,15 @@ async def list_users_endpoint(
     return UserListResponse(items=[_serialize_user(user) for user in users])
 
 
+@router.get("/user-behavior", response_model=AdminUserBehaviorResponse)
+async def list_user_behavior_endpoint(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db_session),
+    _: User = Depends(require_role(RoleName.ADMIN)),
+) -> AdminUserBehaviorResponse:
+    return AdminUserBehaviorResponse(items=build_admin_user_behavior_overview(db, limit=limit))
+
+
 @router.get("/companies", response_model=CompanyListResponse)
 async def list_companies_endpoint(
     db: Session = Depends(get_db_session),
@@ -165,6 +184,8 @@ async def create_company_endpoint(
         aliases=_normalize_aliases(payload.aliases),
         description=payload.description.strip() if payload.description else None,
         is_active=payload.is_active,
+        source_kind="admin",
+        coverage_status="pending",
     )
     db.add(created_company)
     db.commit()

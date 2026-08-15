@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -171,12 +171,24 @@ def crawl_market_dataset(db: Session, crawl_run: CrawlRun) -> dict[str, object]:
         }
 
     seeded_companies = ensure_seed_companies(db)
-    companies = list_active_companies(db)
-    crawler = MarketDataCrawler()
+    summary = refresh_companies_market_data(db)
+    summary["seeded_companies"] = seeded_companies
+    return summary
 
+
+def refresh_companies_market_data(
+    db: Session,
+    *,
+    company_ids: list[int] | None = None,
+) -> dict[str, object]:
+    companies = list_active_companies(db)
+    if company_ids:
+        target_ids = set(company_ids)
+        companies = [company for company in companies if company.id in target_ids]
+
+    crawler = MarketDataCrawler()
     summary: dict[str, object] = {
         "status": "succeeded",
-        "seeded_companies": seeded_companies,
         "companies_total": len(companies),
         "price_rows_created": 0,
         "price_rows_updated": 0,
@@ -186,6 +198,12 @@ def crawl_market_dataset(db: Session, crawl_run: CrawlRun) -> dict[str, object]:
 
     try:
         for company in companies:
+            company.last_refresh_at = datetime.now(timezone.utc)
+            company.last_refresh_error = None
+            company.coverage_status = "pending"
+            db.add(company)
+            db.commit()
+
             try:
                 bars = crawler.fetch_company_history(company.symbol, days=MARKET_HISTORY_DAYS)
                 price_created, price_updated = upsert_daily_prices(db, company, bars)
@@ -194,6 +212,12 @@ def crawl_market_dataset(db: Session, crawl_run: CrawlRun) -> dict[str, object]:
                     sample_days=FLOORSHEET_SAMPLE_DAYS,
                 )
                 floorsheet_created = insert_floorsheet_rows(db, company, floorsheet_rows)
+
+                company.coverage_status = "ready" if bars else "pending"
+                company.last_refresh_error = None
+                company.last_refresh_at = datetime.now(timezone.utc)
+                db.add(company)
+                db.commit()
 
                 summary["price_rows_created"] += price_created
                 summary["price_rows_updated"] += price_updated
@@ -207,6 +231,11 @@ def crawl_market_dataset(db: Session, crawl_run: CrawlRun) -> dict[str, object]:
                     "floorsheet_rows_created": floorsheet_created,
                 }
             except Exception as exc:
+                company.coverage_status = "error"
+                company.last_refresh_error = str(exc)
+                company.last_refresh_at = datetime.now(timezone.utc)
+                db.add(company)
+                db.commit()
                 logger.warning("Market-data crawl failed for %s: %s", company.symbol, exc)
                 summary["companies"][company.symbol] = {"status": "failed", "error": str(exc)}
     finally:
@@ -245,6 +274,8 @@ def ensure_seed_companies(db: Session) -> int:
                 aliases=list(item.get("aliases", [])),
                 description=item.get("description"),
                 is_active=bool(item.get("is_active", True)),
+                source_kind="seed",
+                coverage_status="pending",
             )
         )
         existing_symbols.add(symbol)

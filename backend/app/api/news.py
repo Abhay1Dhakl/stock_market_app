@@ -12,6 +12,7 @@ from app.models.news import NewsCompanyTag, NewsTagCorrection
 from app.models.user import User
 from app.repositories.news_repository import get_news_article_by_id, list_companies_by_ids, list_news_articles
 from app.services.categorization_service import REVIEW_CONFIDENCE_THRESHOLD, list_review_queue_articles
+from app.services.user_behavior_service import record_user_event
 from app.schemas.news import (
     NewsArticleSummary,
     NewsListResponse,
@@ -123,6 +124,16 @@ async def recategorize_news(
         notes=payload.notes,
     )
     db.add(correction)
+    record_user_event(
+        db,
+        user_id=reviewer.id,
+        event_type="review_saved",
+        page_path="/review",
+        article_id=article.id,
+        metadata={"company_ids": unique_company_ids},
+        notes=payload.notes,
+        commit=False,
+    )
     db.commit()
     db.refresh(correction)
 

@@ -18,6 +18,11 @@ class CompanySummary(BaseModel):
     aliases: list[str]
     description: Optional[str] = None
     is_active: bool
+    source_kind: str
+    coverage_status: str
+    last_refresh_at: Optional[datetime] = None
+    last_refresh_error: Optional[str] = None
+    created_by_user_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 

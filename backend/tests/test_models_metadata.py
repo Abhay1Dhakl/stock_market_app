@@ -5,6 +5,8 @@ def test_metadata_contains_core_tables() -> None:
     expected_tables = {
         "roles",
         "users",
+        "user_watchlists",
+        "user_behavior_events",
         "companies",
         "crawl_runs",
         "news_articles",
