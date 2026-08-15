@@ -9,29 +9,29 @@ type LayoutShellProps = {
 
 const navItems = [
   { href: "/", label: "Overview" },
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard", label: "Market Desk" },
   { href: "/review", label: "Review" },
-  { href: "/admin", label: "Admin" },
+  { href: "/admin", label: "Operations" },
   { href: "/login", label: "Sign In" },
 ];
 
-const tickerItems = ["News Crawlers", "30D Prices", "Floorsheet", "Categorization", "RBAC"];
+const tickerItems = ["Personal Watchlists", "News Signals", "Broker Flow", "RBAC", "Behavior Analytics"];
 
 const workspaceStats = [
   {
     label: "News Sources",
     value: "02",
-    note: "ShareSansar and MeroLagani are used for the current news and market data pipeline.",
+    note: "ShareSansar and MeroLagani power the live market and news ingestion flow.",
   },
   {
-    label: "Seeded Names",
+    label: "Coverage",
     value: "06",
-    note: "The current watchlist ships with six seeded NEPSE companies across multiple sectors.",
+    note: "The platform starts with six NEPSE names and now supports user-led company expansion.",
   },
   {
-    label: "Protected Roles",
+    label: "Roles",
     value: "03",
-    note: "Admin, analyst, and viewer permissions are enforced by the backend on every route.",
+    note: "Admin, analyst, and viewer permissions are enforced at the API layer.",
   },
 ];
 
@@ -41,9 +41,11 @@ export function LayoutShell({ title, description, children }: LayoutShellProps) 
       <div className="shell">
         <header className="shell__header">
           <div className="shell__topline">
-            <div className="shell__terminal">
-              <span aria-hidden className="shell__terminal-dot" />
-              <span>NEPSE Stock Intelligence</span>
+            <div className="shell__brand">
+              <Link href="/" className="shell__mark">
+                StockMarket Pro
+              </Link>
+              <span className="shell__brand-note">NEPSE intelligence workspace</span>
             </div>
             <div className="shell__ticker" aria-label="Workspace capabilities">
               {tickerItems.map((item) => (
@@ -56,22 +58,22 @@ export function LayoutShell({ title, description, children }: LayoutShellProps) 
 
           <div className="shell__hero">
             <div className="shell__hero-main">
-              <div className="shell__eyebrow">NEPSE Market Platform</div>
+              <div className="shell__eyebrow">Stock Intelligence Platform</div>
               <h1 className="shell__title">{title}</h1>
               <p className="shell__description">{description}</p>
               <div className="shell__meta">
-                <span className="signal-pill signal-pill--accent">JWT + RBAC</span>
-                <span className="signal-pill">News + OHLCV</span>
-                <span className="signal-pill">Manual Recategorization</span>
+                <span className="signal-pill signal-pill--accent">Role-aware</span>
+                <span className="signal-pill">Dynamic watchlists</span>
+                <span className="signal-pill">Market + news analysis</span>
               </div>
             </div>
 
             <aside className="shell__hero-side">
               <div className="shell__brief">
-                <div className="card__eyebrow">System Summary</div>
+                <div className="card__eyebrow">Platform Summary</div>
                 <p className="shell__brief-copy">
-                  FastAPI and Next.js application for crawling NEPSE market news, tagging tracked companies, storing
-                  30-day market data, and exposing analysis through protected review and administration screens.
+                  A clean operator-facing product for monitoring NEPSE names, expanding coverage from user demand, and
+                  tracking how teams actually use the analysis stack.
                 </p>
                 <div className="shell__status-grid">
                   {workspaceStats.map((item) => (
@@ -88,7 +90,7 @@ export function LayoutShell({ title, description, children }: LayoutShellProps) 
 
           <nav className="shell__nav" aria-label="Primary">
             {navItems.map((item) => (
-              <Link key={item.href} href={item.href}>
+              <Link key={item.href} className="shell__nav-link" href={item.href}>
                 {item.label}
               </Link>
             ))}

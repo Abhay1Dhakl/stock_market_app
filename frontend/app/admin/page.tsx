@@ -7,7 +7,9 @@ import { LayoutShell } from "@/components/layout-shell";
 import { SectionCard } from "@/components/section-card";
 import { apiRequest } from "@/lib/api";
 import { loadSession } from "@/lib/auth";
+import { trackEvent } from "@/lib/telemetry";
 import type {
+  AdminUserBehaviorResponse,
   CompanyCreateRequest,
   CompanyListResponse,
   CompanySummary,
@@ -21,6 +23,7 @@ import type {
 export default function AdminPage() {
   const [session, setSession] = useState<TokenResponse | null>(null);
   const [crawlRuns, setCrawlRuns] = useState<CrawlRunResponse[]>([]);
+  const [behaviorRows, setBehaviorRows] = useState<AdminUserBehaviorResponse["items"]>([]);
   const [users, setUsers] = useState<UserListResponse["items"]>([]);
   const [companies, setCompanies] = useState<CompanySummary[]>([]);
   const [runKind, setRunKind] = useState<"news" | "market_data" | "full">("full");
@@ -55,12 +58,22 @@ export default function AdminPage() {
     void loadAdmin(storedSession);
   }, []);
 
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    void trackEvent(session, {
+      event_type: "admin_view",
+      page_path: "/admin",
+    });
+  }, [session]);
+
   async function loadAdmin(activeSession: TokenResponse) {
     setLoading(true);
     setError(null);
 
     try {
-      const [crawlRunResponse, userResponse, companyResponse] = await Promise.all([
+      const [crawlRunResponse, userResponse, companyResponse, behaviorResponse] = await Promise.all([
         apiRequest<CrawlRunListResponse>("/admin/crawl-runs?limit=10", {
           token: activeSession.access_token,
         }),
@@ -70,12 +83,16 @@ export default function AdminPage() {
         apiRequest<CompanyListResponse>("/admin/companies", {
           token: activeSession.access_token,
         }),
+        apiRequest<AdminUserBehaviorResponse>("/admin/user-behavior?limit=10", {
+          token: activeSession.access_token,
+        }),
       ]);
       setCrawlRuns(crawlRunResponse.items);
       setUsers(userResponse.items);
       setCompanies(companyResponse.items);
+      setBehaviorRows(behaviorResponse.items);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to load admin console.");
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to load the operations console.");
     } finally {
       setLoading(false);
     }
@@ -169,7 +186,7 @@ export default function AdminPage() {
         method: "POST",
         body: payload,
       });
-      setSuccessMessage(`Added ${newCompanySymbol.toUpperCase()} to the watchlist.`);
+      setSuccessMessage(`Added ${newCompanySymbol.toUpperCase()} to platform coverage.`);
       setNewCompanySymbol("");
       setNewCompanyName("");
       setNewCompanySector("");
@@ -214,13 +231,13 @@ export default function AdminPage() {
   if (!session) {
     return (
       <LayoutShell
-        title="Administration"
-        description="Admin access is required before this page can manage crawl runs, user creation, and operational metadata."
+        title="Operations"
+        description="Administrator access is required before the operations console can manage crawl runs, users, and dynamic coverage."
       >
         <SectionCard eyebrow="Access" title="Session Required">
-          <p>Login as the admin user and return here.</p>
+          <p>Sign in as an administrator to open the operations console.</p>
           <Link className="button" href="/login">
-            Go to Login
+            Go to Sign In
           </Link>
         </SectionCard>
       </LayoutShell>
@@ -230,15 +247,16 @@ export default function AdminPage() {
   const activeUsers = users.filter((user) => user.is_active).length;
   const succeededRuns = crawlRuns.filter((run) => run.status === "succeeded").length;
   const activeCompanies = companies.filter((company) => company.is_active).length;
+  const pendingCoverage = companies.filter((company) => company.coverage_status !== "ready").length;
 
   return (
     <LayoutShell
-      title="Administration"
-      description="Trigger crawl jobs, inspect recent run history, and provision role-based users from the protected admin API."
+      title="Operations"
+      description="Control crawls, curate company coverage, provision users, and inspect whether the product is actually being used in a meaningful way."
     >
       {loading ? (
         <SectionCard eyebrow="Status" title="Loading">
-          <p>Fetching crawl history and users.</p>
+          <p>Fetching crawl history, users, coverage, and behavior analytics.</p>
         </SectionCard>
       ) : error ? (
         <SectionCard eyebrow="Status" title="Error">
@@ -247,7 +265,7 @@ export default function AdminPage() {
       ) : (
         <>
           {successMessage ? (
-            <SectionCard eyebrow="Status" title="Success">
+            <SectionCard eyebrow="Status" title="Updated">
               <p>{successMessage}</p>
             </SectionCard>
           ) : null}
@@ -256,268 +274,146 @@ export default function AdminPage() {
             <div className="kpi">
               <div className="kpi__label">Provisioned Users</div>
               <div className="kpi__value">{users.length}</div>
-              <div className="kpi__note">Accounts created through bootstrap and the protected admin user creation flow.</div>
+              <div className="kpi__note">Role-based access accounts currently managed by the platform.</div>
             </div>
             <div className="kpi">
-              <div className="kpi__label">Active Users</div>
-              <div className="kpi__value">{activeUsers}</div>
-              <div className="kpi__note">Users currently flagged as active and allowed to authenticate.</div>
+              <div className="kpi__label">Succeeded Runs</div>
+              <div className="kpi__value">{succeededRuns}</div>
+              <div className="kpi__note">Recent crawl executions that completed without a stored failure state.</div>
             </div>
             <div className="kpi">
-              <div className="kpi__label">Recent Runs</div>
-              <div className="kpi__value">{crawlRuns.length}</div>
-              <div className="kpi__note">The latest crawl executions loaded from the protected admin API.</div>
-            </div>
-            <div className="kpi">
-              <div className="kpi__label">Active Watchlist</div>
+              <div className="kpi__label">Active Coverage</div>
               <div className="kpi__value">{activeCompanies}</div>
-              <div className="kpi__note">Tracked companies currently active for crawling, categorization, and analysis.</div>
+              <div className="kpi__note">Companies currently eligible for the global crawl and analysis pipeline.</div>
+            </div>
+            <div className="kpi">
+              <div className="kpi__label">Pending Coverage</div>
+              <div className="kpi__value">{pendingCoverage}</div>
+              <div className="kpi__note">Names that still need a successful refresh or analyst attention.</div>
             </div>
           </div>
 
           <div className="grid grid--two">
-            <SectionCard eyebrow="Crawlers" title="Run Crawl Pipeline" aside={<span className="badge">{runKind}</span>}>
-              <div className="form">
-                <label className="field">
-                  <span>Run Kind</span>
-                  <select value={runKind} onChange={(event) => setRunKind(event.target.value as typeof runKind)}>
-                    <option value="full">Full</option>
-                    <option value="news">News Only</option>
-                    <option value="market_data">Market Data Only</option>
-                  </select>
-                </label>
-
-                <div className="field">
-                  <span>Sources</span>
-                  <div className="checkbox-grid">
-                    {["merolagani", "sharesansar"].map((source) => (
-                      <label key={source} className="checkbox">
-                        <input
-                          checked={sources.includes(source)}
-                          onChange={() => toggleSource(source)}
-                          type="checkbox"
-                        />
-                        <span>{source}</span>
-                      </label>
-                    ))}
-                  </div>
+            <SectionCard eyebrow="Crawls" title="Trigger A Crawl">
+              <div className="field">
+                <span>Run Kind</span>
+                <div className="tag-row">
+                  {(["full", "news", "market_data"] as const).map((value) => (
+                    <button
+                      key={value}
+                      className={`button ${runKind === value ? "" : "button--ghost"}`}
+                      onClick={() => setRunKind(value)}
+                      type="button"
+                    >
+                      {labelize(value)}
+                    </button>
+                  ))}
                 </div>
-
-                <label className="checkbox">
-                  <input checked={executeNow} onChange={() => setExecuteNow((current) => !current)} type="checkbox" />
-                  <span>Execute immediately in the API process instead of queue-only mode</span>
-                </label>
-
-                <button className="button" disabled={submitting} onClick={triggerCrawl} type="button">
-                  {submitting ? "Running..." : "Start Crawl Run"}
-                </button>
               </div>
-            </SectionCard>
 
-            <SectionCard eyebrow="Users" title="Create Platform User" aside={<span className="badge">{newUserRole}</span>}>
-              <div className="form">
-                <label className="field">
-                  <span>Full Name</span>
-                  <input
-                    value={newUserFullName}
-                    onChange={(event) => setNewUserFullName(event.target.value)}
-                    placeholder="Analyst User"
-                    type="text"
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Email</span>
-                  <input
-                    value={newUserEmail}
-                    onChange={(event) => setNewUserEmail(event.target.value)}
-                    placeholder="analyst@example.com"
-                    type="email"
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Password</span>
-                  <input
-                    value={newUserPassword}
-                    onChange={(event) => setNewUserPassword(event.target.value)}
-                    placeholder="analyst123"
-                    type="password"
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Role</span>
-                  <select value={newUserRole} onChange={(event) => setNewUserRole(event.target.value as typeof newUserRole)}>
-                    <option value="analyst">Analyst</option>
-                    <option value="viewer">Viewer</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </label>
-
-                <label className="checkbox">
-                  <input checked={newUserIsActive} onChange={() => setNewUserIsActive((current) => !current)} type="checkbox" />
-                  <span>User is active</span>
-                </label>
-
-                <button
-                  className="button"
-                  disabled={creatingUser || !newUserFullName || !newUserEmail || !newUserPassword}
-                  onClick={createUser}
-                  type="button"
-                >
-                  {creatingUser ? "Creating..." : "Create User"}
-                </button>
+              <div className="field">
+                <span>Sources</span>
+                <div className="tag-row">
+                  {["merolagani", "sharesansar"].map((source) => (
+                    <label key={source} className="checkbox checkbox--inline">
+                      <input checked={sources.includes(source)} onChange={() => toggleSource(source)} type="checkbox" />
+                      <span>{labelize(source)}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </SectionCard>
-          </div>
 
-          <div className="grid grid--two">
-            <SectionCard eyebrow="Directory" title="User Directory" aside={<span className="badge">{users.length} total</span>}>
+              <label className="checkbox checkbox--inline">
+                <input checked={executeNow} onChange={() => setExecuteNow((value) => !value)} type="checkbox" />
+                <span>Run immediately inside the current request</span>
+              </label>
+
+              <button className="button" disabled={submitting} onClick={triggerCrawl} type="button">
+                {submitting ? "Submitting..." : "Start Crawl"}
+              </button>
+
               <div className="table-wrap">
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
+                      <th>Run</th>
                       <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map((user) => (
-                      <tr key={user.id}>
-                        <td>{user.full_name}</td>
-                        <td>{user.email}</td>
-                        <td>{user.role}</td>
-                        <td>{user.is_active ? "Active" : "Inactive"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </SectionCard>
-
-            <SectionCard eyebrow="Runs" title="Run History" aside={<span className="badge">{crawlRuns.length} loaded</span>}>
-              <div className="table-wrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Status</th>
-                      <th>Kind</th>
                       <th>Requested By</th>
-                      <th>Finished</th>
-                      <th>Stats</th>
+                      <th>Started</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {crawlRuns.map((crawlRun) => (
-                      <tr key={crawlRun.id}>
-                        <td>{crawlRun.id}</td>
-                        <td>{crawlRun.status}</td>
-                        <td>{crawlRun.run_kind}</td>
-                        <td>{crawlRun.requested_by ?? "system"}</td>
-                        <td>{crawlRun.finished_at ? new Date(crawlRun.finished_at).toLocaleString() : "Pending"}</td>
-                        <td>
-                          <pre className="json-block">{JSON.stringify(crawlRun.run_stats, null, 2)}</pre>
-                        </td>
+                    {crawlRuns.map((run) => (
+                      <tr key={run.id}>
+                        <td>{labelize(run.run_kind)}</td>
+                        <td>{labelize(run.status)}</td>
+                        <td>{run.requested_by ?? "System"}</td>
+                        <td>{formatDate(run.started_at)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </SectionCard>
+
+            <SectionCard eyebrow="Adoption" title="User Behavior Overview">
+              {behaviorRows.length === 0 ? (
+                <p className="muted">No behavior events have been recorded yet.</p>
+              ) : (
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Events</th>
+                        <th>Watchlist</th>
+                        <th>Favorite Symbol</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {behaviorRows.map((row) => (
+                        <tr key={row.user_id}>
+                          <td>
+                            {row.full_name}
+                            <div className="muted">{row.email}</div>
+                          </td>
+                          <td>{row.role}</td>
+                          <td>{row.total_events}</td>
+                          <td>{row.watchlist_size}</td>
+                          <td>{row.favorite_symbol ?? "N/A"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
           </div>
 
           <div className="grid grid--two">
-            <SectionCard eyebrow="Watchlist" title="Add Tracked Company" aside={<span className="badge">{activeCompanies} active</span>}>
-              <div className="form">
-                <label className="field">
-                  <span>Symbol</span>
-                  <input
-                    value={newCompanySymbol}
-                    onChange={(event) => setNewCompanySymbol(event.target.value.toUpperCase())}
-                    placeholder="NICA"
-                    type="text"
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Company Name</span>
-                  <input
-                    value={newCompanyName}
-                    onChange={(event) => setNewCompanyName(event.target.value)}
-                    placeholder="NIC Asia Bank Limited"
-                    type="text"
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Sector</span>
-                  <input
-                    value={newCompanySector}
-                    onChange={(event) => setNewCompanySector(event.target.value)}
-                    placeholder="Banking"
-                    type="text"
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Aliases</span>
-                  <input
-                    value={newCompanyAliases}
-                    onChange={(event) => setNewCompanyAliases(event.target.value)}
-                    placeholder="NIC Asia, NICA"
-                    type="text"
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Description</span>
-                  <textarea
-                    rows={3}
-                    value={newCompanyDescription}
-                    onChange={(event) => setNewCompanyDescription(event.target.value)}
-                    placeholder="Short reason for tracking this company."
-                  />
-                </label>
-
-                <label className="checkbox">
-                  <input checked={newCompanyIsActive} onChange={() => setNewCompanyIsActive((current) => !current)} type="checkbox" />
-                  <span>Track this company immediately</span>
-                </label>
-
-                <button
-                  className="button"
-                  disabled={creatingCompany || !newCompanySymbol || !newCompanyName || !newCompanySector}
-                  onClick={createCompany}
-                  type="button"
-                >
-                  {creatingCompany ? "Adding..." : "Add Company"}
-                </button>
-              </div>
-            </SectionCard>
-
-            <SectionCard eyebrow="Watchlist" title="Current Coverage" aside={<span className="badge">{companies.length} total</span>}>
+            <SectionCard eyebrow="Coverage" title="Company Coverage Status">
               <div className="table-wrap">
                 <table className="table">
                   <thead>
                     <tr>
                       <th>Symbol</th>
-                      <th>Name</th>
-                      <th>Sector</th>
+                      <th>Source</th>
                       <th>Status</th>
-                      <th>Action</th>
+                      <th>Last Refresh</th>
+                      <th>Mode</th>
                     </tr>
                   </thead>
                   <tbody>
                     {companies.map((company) => (
                       <tr key={company.id}>
-                        <td>{company.symbol}</td>
-                        <td>{company.name}</td>
-                        <td>{company.sector}</td>
-                        <td>{company.is_active ? "Active" : "Inactive"}</td>
+                        <td>
+                          {company.symbol}
+                          <div className="muted">{company.name}</div>
+                        </td>
+                        <td>{labelize(company.source_kind)}</td>
+                        <td>{coverageLabel(company.coverage_status)}</td>
+                        <td>{formatDate(company.last_refresh_at)}</td>
                         <td>
                           <button
                             className="button button--ghost"
@@ -538,6 +434,101 @@ export default function AdminPage() {
                 </table>
               </div>
             </SectionCard>
+
+            <SectionCard eyebrow="Coverage" title="Create A Company">
+              <div className="form">
+                <label className="field">
+                  <span>Symbol</span>
+                  <input value={newCompanySymbol} onChange={(event) => setNewCompanySymbol(event.target.value.toUpperCase())} />
+                </label>
+                <label className="field">
+                  <span>Company Name</span>
+                  <input value={newCompanyName} onChange={(event) => setNewCompanyName(event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Sector</span>
+                  <input value={newCompanySector} onChange={(event) => setNewCompanySector(event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Aliases</span>
+                  <input value={newCompanyAliases} onChange={(event) => setNewCompanyAliases(event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Description</span>
+                  <textarea rows={3} value={newCompanyDescription} onChange={(event) => setNewCompanyDescription(event.target.value)} />
+                </label>
+                <label className="checkbox checkbox--inline">
+                  <input checked={newCompanyIsActive} onChange={() => setNewCompanyIsActive((value) => !value)} type="checkbox" />
+                  <span>Include this company in active coverage immediately</span>
+                </label>
+                <button className="button" disabled={creatingCompany} onClick={createCompany} type="button">
+                  {creatingCompany ? "Creating..." : "Create Company"}
+                </button>
+              </div>
+            </SectionCard>
+          </div>
+
+          <div className="grid grid--two">
+            <SectionCard eyebrow="Users" title="Current Team">
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th>Last Login</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((user) => (
+                      <tr key={user.id}>
+                        <td>
+                          {user.full_name}
+                          <div className="muted">{user.email}</div>
+                        </td>
+                        <td>{user.role}</td>
+                        <td>{user.is_active ? "Active" : "Inactive"}</td>
+                        <td>{formatDate(user.last_login_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="muted">{activeUsers} of {users.length} users are currently active.</p>
+            </SectionCard>
+
+            <SectionCard eyebrow="Users" title="Provision A New User">
+              <div className="form">
+                <label className="field">
+                  <span>Full Name</span>
+                  <input value={newUserFullName} onChange={(event) => setNewUserFullName(event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Email</span>
+                  <input type="email" value={newUserEmail} onChange={(event) => setNewUserEmail(event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Password</span>
+                  <input type="password" value={newUserPassword} onChange={(event) => setNewUserPassword(event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Role</span>
+                  <select value={newUserRole} onChange={(event) => setNewUserRole(event.target.value as typeof newUserRole)}>
+                    <option value="admin">Admin</option>
+                    <option value="analyst">Analyst</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+                </label>
+                <label className="checkbox checkbox--inline">
+                  <input checked={newUserIsActive} onChange={() => setNewUserIsActive((value) => !value)} type="checkbox" />
+                  <span>Create the user as active</span>
+                </label>
+                <button className="button" disabled={creatingUser} onClick={createUser} type="button">
+                  {creatingUser ? "Creating..." : "Create User"}
+                </button>
+              </div>
+            </SectionCard>
           </div>
         </>
       )}
@@ -550,4 +541,29 @@ function parseAliases(value: string): string[] {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function formatDate(value: string | null): string {
+  if (!value) {
+    return "N/A";
+  }
+  return new Date(value).toLocaleString();
+}
+
+function labelize(value: string): string {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function coverageLabel(value: string): string {
+  switch (value) {
+    case "ready":
+      return "Ready";
+    case "error":
+      return "Needs Attention";
+    default:
+      return "Refreshing";
+  }
 }

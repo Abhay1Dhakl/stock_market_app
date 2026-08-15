@@ -44,11 +44,11 @@ export default function LoginPage() {
 
   return (
     <LayoutShell
-      title="Sign In"
-      description="Authenticate against the backend to open the dashboard, review queue, and administration pages."
+      title="Secure Access"
+      description="Authenticate once to unlock personal watchlists, review operations, dynamic company coverage, and the administrator workspace."
     >
       <div className="grid grid--two">
-        <SectionCard eyebrow="Authentication" title="Open A Protected Session" aside={<span className="badge">JWT</span>}>
+        <SectionCard eyebrow="Authentication" title="Open The Workspace" aside={<span className="badge">JWT Session</span>}>
           <form className="form" onSubmit={handleSubmit}>
             <label className="field">
               <span>Email</span>
@@ -60,16 +60,16 @@ export default function LoginPage() {
             </label>
             {error ? <p className="error-text">{error}</p> : null}
             <button className="button" disabled={loading} type="submit">
-              {loading ? "Signing In..." : "Sign In"}
+              {loading ? "Signing In..." : "Continue"}
             </button>
           </form>
         </SectionCard>
 
-        <SectionCard eyebrow="Session" title="Session Details">
+        <SectionCard eyebrow="Access" title="Session Status">
           {session ? (
             <>
               <p>
-                Signed in as <strong>{session.user.full_name}</strong> ({session.user.role}).
+                Signed in as <strong>{session.user.full_name}</strong> with the <strong>{session.user.role}</strong> role.
               </p>
               <div className="stat-row">
                 <span>Role</span>
@@ -79,23 +79,23 @@ export default function LoginPage() {
                 <span>Email</span>
                 <strong>{session.user.email}</strong>
               </div>
-              <p className="muted">The access token is stored in local browser storage by this frontend client.</p>
+              <p className="muted">This frontend keeps the token in local browser storage for the current session.</p>
               <Link className="button" href="/dashboard">
-                Open Dashboard
+                Open Market Desk
               </Link>
             </>
           ) : (
             <>
-              <p>No session is stored yet.</p>
+              <p>No local session is stored yet.</p>
               <div className="stat-row">
-                <span>Default Email</span>
+                <span>Demo Email</span>
                 <strong>admin@example.com</strong>
               </div>
               <div className="stat-row">
-                <span>Default Password</span>
+                <span>Demo Password</span>
                 <strong>admin123</strong>
               </div>
-              <p className="muted">The form is prefilled with the administrator account created during backend bootstrap.</p>
+              <p className="muted">The form starts with the bootstrap administrator account so you can get into the product immediately.</p>
             </>
           )}
         </SectionCard>

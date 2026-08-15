@@ -7,6 +7,7 @@ import { LayoutShell } from "@/components/layout-shell";
 import { SectionCard } from "@/components/section-card";
 import { apiRequest } from "@/lib/api";
 import { loadSession } from "@/lib/auth";
+import { trackEvent } from "@/lib/telemetry";
 import type { CompanyListResponse, CompanySummary, NewsArticleSummary, NewsListResponse, TokenResponse } from "@/types";
 
 type SelectionState = Record<number, number[]>;
@@ -32,6 +33,16 @@ export default function ReviewPage() {
 
     void loadReviewQueue(storedSession);
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    void trackEvent(session, {
+      event_type: "review_view",
+      page_path: "/review",
+    });
+  }, [session]);
 
   async function loadReviewQueue(activeSession: TokenResponse) {
     setLoading(true);
@@ -96,13 +107,13 @@ export default function ReviewPage() {
   if (!session) {
     return (
       <LayoutShell
-        title="Review Queue"
-        description="Analyst or admin access is required before this page can load low-confidence or untagged news items."
+        title="Review Desk"
+        description="Analyst or admin access is required before the review desk can load low-confidence or untagged news items."
       >
         <SectionCard title="Session Required">
-          <p>Login as an analyst or admin and return here.</p>
+          <p>Sign in as an analyst or administrator to review tagging decisions.</p>
           <Link className="button" href="/login">
-            Go to Login
+            Go to Sign In
           </Link>
         </SectionCard>
       </LayoutShell>
@@ -113,8 +124,8 @@ export default function ReviewPage() {
 
   return (
     <LayoutShell
-      title="Categorization Review Queue"
-      description="Review low-confidence or untagged articles, correct company associations, and persist analyst-approved categorizations."
+      title="Review Desk"
+      description="Validate weak matches, correct company associations, and keep the market intelligence layer trustworthy."
     >
       {loading ? (
         <SectionCard title="Loading">
@@ -133,8 +144,8 @@ export default function ReviewPage() {
           ) : null}
 
           {articles.length === 0 ? (
-            <SectionCard eyebrow="Queue" title="Queue Empty">
-              <p>No low-confidence or uncategorized news items currently need analyst review.</p>
+            <SectionCard eyebrow="Queue" title="All Clear">
+              <p>No low-confidence or untagged news items currently need review.</p>
             </SectionCard>
           ) : (
             <>
@@ -142,17 +153,17 @@ export default function ReviewPage() {
                 <div className="kpi">
                   <div className="kpi__label">Articles Pending</div>
                   <div className="kpi__value">{articles.length}</div>
-                  <div className="kpi__note">Low-confidence or untagged headlines that still need an analyst decision.</div>
+                  <div className="kpi__note">Stories waiting for a human decision before the tags can be trusted.</div>
                 </div>
                 <div className="kpi">
-                  <div className="kpi__label">Selected Links</div>
+                  <div className="kpi__label">Chosen Links</div>
                   <div className="kpi__value">{suggestedLinks}</div>
                   <div className="kpi__note">Company associations currently selected across the loaded review set.</div>
                 </div>
                 <div className="kpi">
-                  <div className="kpi__label">Signed-In Role</div>
+                  <div className="kpi__label">Active Role</div>
                   <div className="kpi__value">{session.user.role}</div>
-                  <div className="kpi__note">Corrections are stored server-side and replace the automatic company label set.</div>
+                  <div className="kpi__note">Saved corrections become the trusted label set for the affected article.</div>
                 </div>
               </div>
 
@@ -174,7 +185,7 @@ export default function ReviewPage() {
                         Open source article
                       </a>
                     </p>
-                    <p>{article.excerpt ?? "No excerpt available."}</p>
+                    <p>{article.excerpt ?? "No excerpt is available for this story."}</p>
                     <div className="tag-row">
                       {article.tags.length ? (
                         article.tags.map((tag) => (
@@ -206,6 +217,7 @@ export default function ReviewPage() {
                       <span>Reviewer Notes</span>
                       <textarea
                         rows={3}
+                        placeholder="Optional rationale for the correction"
                         value={notes[article.id] ?? ""}
                         onChange={(event) =>
                           setNotes((current) => ({
@@ -217,7 +229,7 @@ export default function ReviewPage() {
                     </label>
 
                     <button className="button" onClick={() => submitReview(article.id)} type="button">
-                      Save Correction
+                      Save Decision
                     </button>
                   </SectionCard>
                 ))}

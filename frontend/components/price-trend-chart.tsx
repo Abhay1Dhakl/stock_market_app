@@ -50,8 +50,8 @@ export function PriceTrendChart({ points }: PriceTrendChartProps) {
       >
         <defs>
           <linearGradient id="price-area" x1="0%" x2="0%" y1="0%" y2="100%">
-            <stop offset="0%" stopColor="rgba(245, 166, 35, 0.42)" />
-            <stop offset="100%" stopColor="rgba(245, 166, 35, 0.02)" />
+            <stop offset="0%" stopColor="rgba(15, 98, 254, 0.28)" />
+            <stop offset="100%" stopColor="rgba(15, 98, 254, 0.02)" />
           </linearGradient>
         </defs>
 
@@ -81,7 +81,7 @@ export function PriceTrendChart({ points }: PriceTrendChartProps) {
           );
         })}
 
-        <path className="trend-chart__area" d={areaPath} />
+        <path d={areaPath} fill="url(#price-area)" />
         <path className="trend-chart__line" d={path} />
 
         {points.map((point, index) => {

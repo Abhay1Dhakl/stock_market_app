@@ -22,6 +22,11 @@ export type CompanySummary = {
   aliases: string[];
   description: string | null;
   is_active: boolean;
+  source_kind: string;
+  coverage_status: string;
+  last_refresh_at: string | null;
+  last_refresh_error: string | null;
+  created_by_user_id: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -45,6 +50,15 @@ export type CompanyUpdateRequest = {
   aliases?: string[];
   description?: string | null;
   is_active?: boolean;
+};
+
+export type WatchlistMutationRequest = {
+  company_id?: number;
+  symbol?: string;
+  name?: string;
+  sector?: string;
+  aliases?: string[];
+  description?: string | null;
 };
 
 export type DailyPrice = {
@@ -171,4 +185,70 @@ export type UserSummary = {
 
 export type UserListResponse = {
   items: UserSummary[];
+};
+
+export type CompanyInsight = {
+  company: CompanySummary;
+  summary: BehaviorSummary;
+  is_in_watchlist: boolean;
+  mention_count: number;
+  last_mentioned_at: string | null;
+  recent_headline: string | null;
+};
+
+export type UserWatchlistResponse = {
+  items: CompanyInsight[];
+};
+
+export type DiscoveryFeedResponse = {
+  items: CompanyInsight[];
+};
+
+export type BehaviorBreakdownItem = {
+  event_type: string;
+  count: number;
+};
+
+export type BehaviorCompanyInterest = {
+  company_id: number;
+  symbol: string;
+  name: string;
+  interactions: number;
+};
+
+export type UserBehaviorEventItem = {
+  event_type: string;
+  occurred_at: string;
+  page_path: string | null;
+  company_id: number | null;
+  company_symbol: string | null;
+  company_name: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type UserBehaviorSummaryResponse = {
+  total_events: number;
+  watchlist_size: number;
+  companies_explored: number;
+  favorite_sector: string | null;
+  last_activity_at: string | null;
+  event_breakdown: BehaviorBreakdownItem[];
+  top_companies: BehaviorCompanyInterest[];
+  recent_activity: UserBehaviorEventItem[];
+};
+
+export type AdminUserBehaviorRow = {
+  user_id: number;
+  full_name: string;
+  email: string;
+  role: string;
+  watchlist_size: number;
+  total_events: number;
+  companies_explored: number;
+  last_activity_at: string | null;
+  favorite_symbol: string | null;
+};
+
+export type AdminUserBehaviorResponse = {
+  items: AdminUserBehaviorRow[];
 };
