@@ -62,5 +62,4 @@ databases:
     postgresMajorVersion: "16"
     databaseName: stock_market
     user: stock_user
-    diskSizeGB: 1
     ipAllowList: []
