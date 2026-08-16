@@ -28,22 +28,22 @@ class Company(Base, TimestampMixin):
         nullable=True,
     )
 
-    price_history: Mapped[list["DailyPrice"]] = relationship(
+    price_history: Mapped[list[DailyPrice]] = relationship(
         back_populates="company",
         cascade="all, delete-orphan",
     )
-    floorsheet_transactions: Mapped[list["FloorsheetTransaction"]] = relationship(
+    floorsheet_transactions: Mapped[list[FloorsheetTransaction]] = relationship(
         back_populates="company",
         cascade="all, delete-orphan",
     )
-    news_tags: Mapped[list["NewsCompanyTag"]] = relationship(back_populates="company")
-    analysis_snapshots: Mapped[list["CompanyAnalysisSnapshot"]] = relationship(
+    news_tags: Mapped[list[NewsCompanyTag]] = relationship(back_populates="company")
+    analysis_snapshots: Mapped[list[CompanyAnalysisSnapshot]] = relationship(
         back_populates="company",
         cascade="all, delete-orphan",
     )
-    watchlist_entries: Mapped[list["UserWatchlistEntry"]] = relationship(
+    watchlist_entries: Mapped[list[UserWatchlistEntry]] = relationship(
         back_populates="company",
         cascade="all, delete-orphan",
     )
-    behavior_events: Mapped[list["UserBehaviorEvent"]] = relationship(back_populates="company")
-    created_by: Mapped[Optional["User"]] = relationship(back_populates="created_companies")
+    behavior_events: Mapped[list[UserBehaviorEvent]] = relationship(back_populates="company")
+    created_by: Mapped[Optional[User]] = relationship(back_populates="created_companies")

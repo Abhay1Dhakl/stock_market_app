@@ -38,6 +38,6 @@ class UserBehaviorEvent(Base):
         nullable=False,
     )
 
-    user: Mapped["User"] = relationship(back_populates="behavior_events")
-    company: Mapped[Optional["Company"]] = relationship(back_populates="behavior_events")
-    article: Mapped[Optional["NewsArticle"]] = relationship(back_populates="behavior_events")
+    user: Mapped[User] = relationship(back_populates="behavior_events")
+    company: Mapped[Optional[Company]] = relationship(back_populates="behavior_events")
+    article: Mapped[Optional[NewsArticle]] = relationship(back_populates="behavior_events")

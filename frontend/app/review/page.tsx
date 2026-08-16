@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { LayoutShell } from "@/components/layout-shell";
+import { Pager } from "@/components/pager";
 import { SectionCard } from "@/components/section-card";
 import { apiRequest } from "@/lib/api";
 import { loadSession } from "@/lib/auth";
@@ -13,12 +14,18 @@ import type { CompanyListResponse, CompanySummary, NewsArticleSummary, NewsListR
 type SelectionState = Record<number, number[]>;
 type NotesState = Record<number, string>;
 
+const REVIEW_ARTICLES_PER_PAGE = 3;
+const REVIEW_COMPANIES_PER_PAGE = 10;
+
 export default function ReviewPage() {
   const [session, setSession] = useState<TokenResponse | null>(null);
   const [companies, setCompanies] = useState<CompanySummary[]>([]);
   const [articles, setArticles] = useState<NewsArticleSummary[]>([]);
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<SelectionState>({});
   const [notes, setNotes] = useState<NotesState>({});
+  const [articlePage, setArticlePage] = useState(1);
+  const [companyPickerPage, setCompanyPickerPage] = useState(1);
+  const [companySearch, setCompanySearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -57,6 +64,9 @@ export default function ReviewPage() {
 
       setCompanies(companiesResponse.items);
       setArticles(articlesResponse.items);
+      setArticlePage(1);
+      setCompanyPickerPage(1);
+      setCompanySearch("");
 
       const selection: SelectionState = {};
       for (const article of articlesResponse.items) {
@@ -121,6 +131,14 @@ export default function ReviewPage() {
   }
 
   const suggestedLinks = Object.values(selectedCompanyIds).reduce((total, companyIds) => total + companyIds.length, 0);
+  const articlePageCount = getPageCount(articles.length, REVIEW_ARTICLES_PER_PAGE);
+  const filteredCompanies = companies.filter((company) => matchesCompanySearch(company, companySearch));
+  const companyPickerPageCount = getPageCount(filteredCompanies.length, REVIEW_COMPANIES_PER_PAGE);
+  const visibleArticles = paginateItems(articles, articlePage, REVIEW_ARTICLES_PER_PAGE);
+  const visibleCompanies = paginateItems(filteredCompanies, companyPickerPage, REVIEW_COMPANIES_PER_PAGE);
+  const articleRangeLabel = formatRangeLabel(articles.length, articlePage, REVIEW_ARTICLES_PER_PAGE);
+  const companyRangeLabel = formatRangeLabel(filteredCompanies.length, companyPickerPage, REVIEW_COMPANIES_PER_PAGE);
+  const companyLookup = new Map(companies.map((company) => [company.id, company]));
 
   return (
     <LayoutShell
@@ -167,8 +185,48 @@ export default function ReviewPage() {
                 </div>
               </div>
 
+              <SectionCard eyebrow="Selector" title="Browse Company Options" aside={<span className="badge">{filteredCompanies.length} companies</span>}>
+                <div className="section-toolbar">
+                  <label className="field section-toolbar__grow">
+                    <span>Filter Companies</span>
+                    <input
+                      onChange={(event) => {
+                        setCompanySearch(event.target.value);
+                        setCompanyPickerPage(1);
+                      }}
+                      placeholder="Search by symbol or company name"
+                      value={companySearch}
+                    />
+                  </label>
+                  <div className="stack">
+                    <p className="pager__summary">{companyRangeLabel}</p>
+                    <Pager
+                      label="Review company picker pages"
+                      onPageChange={setCompanyPickerPage}
+                      page={companyPickerPage}
+                      totalPages={companyPickerPageCount}
+                    />
+                  </div>
+                </div>
+              </SectionCard>
+
+              <div className="section-toolbar">
+                <p className="pager__summary">{articleRangeLabel}</p>
+                <Pager
+                  label="Review article pages"
+                  onPageChange={setArticlePage}
+                  page={articlePage}
+                  totalPages={articlePageCount}
+                />
+              </div>
+
               <div className="stack">
-                {articles.map((article) => (
+                {visibleArticles.map((article) => {
+                  const selectedCompanies = (selectedCompanyIds[article.id] ?? [])
+                    .map((companyId) => companyLookup.get(companyId))
+                    .filter((company): company is CompanySummary => Boolean(company));
+
+                  return (
                   <SectionCard
                     key={article.id}
                     eyebrow={article.source_name}
@@ -198,20 +256,38 @@ export default function ReviewPage() {
                       )}
                     </div>
 
-                    <div className="checkbox-grid">
-                      {companies.map((company) => (
-                        <label key={company.id} className="checkbox">
-                          <input
-                            checked={(selectedCompanyIds[article.id] ?? []).includes(company.id)}
-                            onChange={() => toggleCompany(article.id, company.id)}
-                            type="checkbox"
-                          />
-                          <span>
-                            {company.symbol} · {company.name}
+                    <div className="tag-row">
+                      {selectedCompanies.length ? (
+                        selectedCompanies.map((company) => (
+                          <span key={`${article.id}-selected-${company.id}`} className="badge badge--success">
+                            Selected: {company.symbol}
                           </span>
-                        </label>
-                      ))}
+                        ))
+                      ) : (
+                        <span className="badge badge--pending">No company selected yet</span>
+                      )}
                     </div>
+
+                    <p className="muted">{companyRangeLabel} in the shared company picker for this review page.</p>
+
+                    {visibleCompanies.length === 0 ? (
+                      <p className="muted">No companies match the current filter.</p>
+                    ) : (
+                      <div className="checkbox-grid">
+                        {visibleCompanies.map((company) => (
+                          <label key={company.id} className="checkbox">
+                            <input
+                              checked={(selectedCompanyIds[article.id] ?? []).includes(company.id)}
+                              onChange={() => toggleCompany(article.id, company.id)}
+                              type="checkbox"
+                            />
+                            <span>
+                              {company.symbol} · {company.name}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
 
                     <label className="field">
                       <span>Reviewer Notes</span>
@@ -232,7 +308,8 @@ export default function ReviewPage() {
                       Save Decision
                     </button>
                   </SectionCard>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
@@ -247,4 +324,34 @@ function formatDate(value: string | null): string {
     return "Unknown";
   }
   return new Date(value).toLocaleString();
+}
+
+function getPageCount(totalItems: number, pageSize: number): number {
+  return Math.max(1, Math.ceil(totalItems / pageSize));
+}
+
+function paginateItems<T>(items: T[], page: number, pageSize: number): T[] {
+  const start = (page - 1) * pageSize;
+  return items.slice(start, start + pageSize);
+}
+
+function formatRangeLabel(totalItems: number, page: number, pageSize: number): string {
+  if (totalItems === 0) {
+    return "Showing 0 items";
+  }
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalItems);
+  return `Showing ${start}-${end} of ${totalItems}`;
+}
+
+function matchesCompanySearch(company: CompanySummary, query: string): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  return (
+    company.symbol.toLowerCase().includes(normalizedQuery) ||
+    company.name.toLowerCase().includes(normalizedQuery)
+  );
 }

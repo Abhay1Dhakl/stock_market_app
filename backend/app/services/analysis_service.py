@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import select

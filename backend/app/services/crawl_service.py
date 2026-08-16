@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.crawlers.base import CrawledArticle
-from app.crawlers.market_data import DailyTradingBar, FloorsheetTrade, ListedCompanyRecord, MarketDataCrawler
+from app.crawlers.market_data import DailyTradingBar, FloorsheetTrade, MarketDataCrawler
 from app.crawlers.merolagani import MeroLaganiCrawler
 from app.crawlers.sharesansar import ShareSansarCrawler
 from app.models import Company, CrawlRun, DailyPrice, FloorsheetTransaction, NewsArticle, NewsCompanyTag, UserWatchlistEntry

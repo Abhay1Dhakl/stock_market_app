@@ -6,9 +6,6 @@ from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.schemas.behavior import AdminUserBehaviorResponse
-
-
 class CrawlRunRequest(BaseModel):
     sources: list[str] = Field(default_factory=lambda: ["merolagani", "sharesansar"])
     run_kind: Literal["news", "market_data", "full"] = "full"

@@ -58,6 +58,55 @@ export default function CompanyDetailPage() {
       return;
     }
 
+    async function loadCompany(activeSession: TokenResponse) {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const [
+          companyResponse,
+          pricesResponse,
+          floorsheetResponse,
+          summaryResponse,
+          correlationResponse,
+          newsResponse,
+          watchlistResponse,
+        ] = await Promise.all([
+          apiRequest<CompanySummary>(`/companies/${companyId}`, { token: activeSession.access_token }),
+          apiRequest<CompanyPricesResponse>(`/companies/${companyId}/prices?range=30d`, {
+            token: activeSession.access_token,
+          }),
+          apiRequest<CompanyFloorsheetResponse>(`/companies/${companyId}/floorsheet`, {
+            token: activeSession.access_token,
+          }),
+          apiRequest<BehaviorSummary>(`/companies/${companyId}/behavior-summary`, {
+            token: activeSession.access_token,
+          }),
+          apiRequest<NewsPriceCorrelationResponse>(`/companies/${companyId}/news-price-correlation`, {
+            token: activeSession.access_token,
+          }),
+          apiRequest<NewsListResponse>(`/news?company_id=${companyId}&limit=12`, {
+            token: activeSession.access_token,
+          }),
+          apiRequest<UserWatchlistResponse>("/users/me/watchlist", {
+            token: activeSession.access_token,
+          }),
+        ]);
+
+        setCompany(companyResponse);
+        setPrices(pricesResponse);
+        setFloorsheet(floorsheetResponse);
+        setSummary(summaryResponse);
+        setCorrelation(correlationResponse);
+        setNewsItems(newsResponse.items);
+        setIsTracked(watchlistResponse.items.some((item) => item.company.id === companyId));
+      } catch (caughtError) {
+        setError(caughtError instanceof Error ? caughtError.message : "Unable to load company details.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
     void loadCompany(storedSession);
   }, [companyId]);
 
@@ -75,55 +124,6 @@ export default function CompanyDetailPage() {
   useEffect(() => {
     setActiveTab("overview");
   }, [companyId]);
-
-  async function loadCompany(activeSession: TokenResponse) {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [
-        companyResponse,
-        pricesResponse,
-        floorsheetResponse,
-        summaryResponse,
-        correlationResponse,
-        newsResponse,
-        watchlistResponse,
-      ] = await Promise.all([
-        apiRequest<CompanySummary>(`/companies/${companyId}`, { token: activeSession.access_token }),
-        apiRequest<CompanyPricesResponse>(`/companies/${companyId}/prices?range=30d`, {
-          token: activeSession.access_token,
-        }),
-        apiRequest<CompanyFloorsheetResponse>(`/companies/${companyId}/floorsheet`, {
-          token: activeSession.access_token,
-        }),
-        apiRequest<BehaviorSummary>(`/companies/${companyId}/behavior-summary`, {
-          token: activeSession.access_token,
-        }),
-        apiRequest<NewsPriceCorrelationResponse>(`/companies/${companyId}/news-price-correlation`, {
-          token: activeSession.access_token,
-        }),
-        apiRequest<NewsListResponse>(`/news?company_id=${companyId}&limit=12`, {
-          token: activeSession.access_token,
-        }),
-        apiRequest<UserWatchlistResponse>("/users/me/watchlist", {
-          token: activeSession.access_token,
-        }),
-      ]);
-
-      setCompany(companyResponse);
-      setPrices(pricesResponse);
-      setFloorsheet(floorsheetResponse);
-      setSummary(summaryResponse);
-      setCorrelation(correlationResponse);
-      setNewsItems(newsResponse.items);
-      setIsTracked(watchlistResponse.items.some((item) => item.company.id === companyId));
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to load company details.");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function toggleWatchlist() {
     if (!session || !company) {

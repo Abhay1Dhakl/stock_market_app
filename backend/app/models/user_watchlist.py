@@ -25,5 +25,5 @@ class UserWatchlistEntry(Base, TimestampMixin):
     )
     source: Mapped[str] = mapped_column(String(20), default="manual", nullable=False)
 
-    user: Mapped["User"] = relationship(back_populates="watchlist_entries")
-    company: Mapped["Company"] = relationship(back_populates="watchlist_entries")
+    user: Mapped[User] = relationship(back_populates="watchlist_entries")
+    company: Mapped[Company] = relationship(back_populates="watchlist_entries")

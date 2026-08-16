@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     cors_origins_raw: str = Field(default="http://localhost:3000", alias="BACKEND_CORS_ORIGINS")
+    cors_origin_regex_raw: Optional[str] = Field(default=None, alias="BACKEND_CORS_ORIGIN_REGEX")
     bootstrap_default_admin: bool = Field(default=True, alias="BOOTSTRAP_DEFAULT_ADMIN")
     bootstrap_admin_name: str = Field(default="System Administrator", alias="BOOTSTRAP_ADMIN_NAME")
     bootstrap_admin_email: str = Field(default="admin@example.com", alias="BOOTSTRAP_ADMIN_EMAIL")
@@ -52,6 +53,13 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list:
         return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
+
+    @property
+    def cors_origin_regex(self) -> Optional[str]:
+        if self.cors_origin_regex_raw is None:
+            return None
+        normalized = self.cors_origin_regex_raw.strip()
+        return normalized or None
 
 
 @lru_cache()

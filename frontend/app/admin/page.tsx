@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { LayoutShell } from "@/components/layout-shell";
+import { Pager } from "@/components/pager";
 import { SectionCard } from "@/components/section-card";
 import { apiRequest } from "@/lib/api";
 import { loadSession } from "@/lib/auth";
@@ -20,12 +21,17 @@ import type {
   UserListResponse,
 } from "@/types";
 
+const COMPANIES_PER_PAGE = 10;
+const USERS_PER_PAGE = 8;
+
 export default function AdminPage() {
   const [session, setSession] = useState<TokenResponse | null>(null);
   const [crawlRuns, setCrawlRuns] = useState<CrawlRunResponse[]>([]);
   const [behaviorRows, setBehaviorRows] = useState<AdminUserBehaviorResponse["items"]>([]);
   const [users, setUsers] = useState<UserListResponse["items"]>([]);
   const [companies, setCompanies] = useState<CompanySummary[]>([]);
+  const [companyPage, setCompanyPage] = useState(1);
+  const [userPage, setUserPage] = useState(1);
   const [runKind, setRunKind] = useState<"news" | "market_data" | "full">("full");
   const [sources, setSources] = useState<string[]>(["merolagani", "sharesansar"]);
   const [executeNow, setExecuteNow] = useState(true);
@@ -91,6 +97,8 @@ export default function AdminPage() {
       setUsers(userResponse.items);
       setCompanies(companyResponse.items);
       setBehaviorRows(behaviorResponse.items);
+      setCompanyPage(1);
+      setUserPage(1);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Unable to load the operations console.");
     } finally {
@@ -248,6 +256,12 @@ export default function AdminPage() {
   const succeededRuns = crawlRuns.filter((run) => run.status === "succeeded").length;
   const activeCompanies = companies.filter((company) => company.is_active).length;
   const pendingCoverage = companies.filter((company) => company.coverage_status !== "ready").length;
+  const companyPageCount = getPageCount(companies.length, COMPANIES_PER_PAGE);
+  const userPageCount = getPageCount(users.length, USERS_PER_PAGE);
+  const visibleCompanies = paginateItems(companies, companyPage, COMPANIES_PER_PAGE);
+  const visibleUsers = paginateItems(users, userPage, USERS_PER_PAGE);
+  const companyRangeLabel = formatRangeLabel(companies.length, companyPage, COMPANIES_PER_PAGE);
+  const userRangeLabel = formatRangeLabel(users.length, userPage, USERS_PER_PAGE);
 
   return (
     <LayoutShell
@@ -393,6 +407,15 @@ export default function AdminPage() {
 
           <div className="grid grid--two">
             <SectionCard eyebrow="Coverage" title="Company Coverage Status">
+              <div className="section-toolbar">
+                <p className="pager__summary">{companyRangeLabel}</p>
+                <Pager
+                  label="Company coverage pages"
+                  onPageChange={setCompanyPage}
+                  page={companyPage}
+                  totalPages={companyPageCount}
+                />
+              </div>
               <div className="table-wrap">
                 <table className="table">
                   <thead>
@@ -405,7 +428,7 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {companies.map((company) => (
+                    {visibleCompanies.map((company) => (
                       <tr key={company.id}>
                         <td>
                           {company.symbol}
@@ -470,6 +493,10 @@ export default function AdminPage() {
 
           <div className="grid grid--two">
             <SectionCard eyebrow="Users" title="Current Team">
+              <div className="section-toolbar">
+                <p className="pager__summary">{userRangeLabel}</p>
+                <Pager label="User pages" onPageChange={setUserPage} page={userPage} totalPages={userPageCount} />
+              </div>
               <div className="table-wrap">
                 <table className="table">
                   <thead>
@@ -481,7 +508,7 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map((user) => (
+                    {visibleUsers.map((user) => (
                       <tr key={user.id}>
                         <td>
                           {user.full_name}
@@ -566,4 +593,22 @@ function coverageLabel(value: string): string {
     default:
       return "Refreshing";
   }
+}
+
+function getPageCount(totalItems: number, pageSize: number): number {
+  return Math.max(1, Math.ceil(totalItems / pageSize));
+}
+
+function paginateItems<T>(items: T[], page: number, pageSize: number): T[] {
+  const start = (page - 1) * pageSize;
+  return items.slice(start, start + pageSize);
+}
+
+function formatRangeLabel(totalItems: number, page: number, pageSize: number): string {
+  if (totalItems === 0) {
+    return "Showing 0 items";
+  }
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalItems);
+  return `Showing ${start}-${end} of ${totalItems}`;
 }

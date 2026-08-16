@@ -1,5 +1,3 @@
-from sqlalchemy import select
-
 from app.models import NewsArticle
 
 

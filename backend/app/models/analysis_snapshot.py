@@ -36,4 +36,4 @@ class CompanyAnalysisSnapshot(Base, TimestampMixin):
     next_day_volume_change_pct: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
     snapshot_payload: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
 
-    company: Mapped["Company"] = relationship(back_populates="analysis_snapshots")
+    company: Mapped[Company] = relationship(back_populates="analysis_snapshots")

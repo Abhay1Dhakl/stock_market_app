@@ -1,15 +1,12 @@
-from app.schemas.admin import (
-    AdminUserBehaviorResponse,
-    CrawlRunListResponse,
-    CrawlRunRequest,
-    CrawlRunResponse,
-    UserCreateRequest,
-    UserListResponse,
-    UserSummaryResponse,
-)
+from app.schemas.admin import CrawlRunListResponse, CrawlRunRequest, CrawlRunResponse, UserCreateRequest, UserListResponse, UserSummaryResponse
 from app.schemas.analysis import BehaviorSummaryResponse, NewsPriceCorrelationResponse
 from app.schemas.auth import LoginRequest, TokenResponse, UserProfile
-from app.schemas.behavior import TelemetryEventRequest, TelemetryEventResponse, UserBehaviorSummaryResponse
+from app.schemas.behavior import (
+    AdminUserBehaviorResponse,
+    TelemetryEventRequest,
+    TelemetryEventResponse,
+    UserBehaviorSummaryResponse,
+)
 from app.schemas.company import (
     CompanyFloorsheetResponse,
     CompanyListResponse,

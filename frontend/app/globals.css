@@ -406,6 +406,59 @@ main {
   margin: 0;
 }
 
+.section-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.section-toolbar__grow {
+  flex: 1 1 280px;
+  min-width: min(100%, 280px);
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pager__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pager__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pager__button--active {
+  border-color: transparent;
+  background: linear-gradient(180deg, #1f67ff, #0f62fe);
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 98, 254, 0.18);
+}
+
+.pager__summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .tab-strip {
   display: grid;
   gap: 10px;

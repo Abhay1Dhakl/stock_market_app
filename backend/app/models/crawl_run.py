@@ -35,5 +35,5 @@ class CrawlRun(Base, TimestampMixin):
         nullable=True,
     )
 
-    triggered_by: Mapped[Optional["User"]] = relationship(back_populates="triggered_crawl_runs")
-    articles: Mapped[list["NewsArticle"]] = relationship(back_populates="crawl_run")
+    triggered_by: Mapped[Optional[User]] = relationship(back_populates="triggered_crawl_runs")
+    articles: Mapped[list[NewsArticle]] = relationship(back_populates="crawl_run")

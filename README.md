@@ -173,6 +173,69 @@ The written findings summary required by the assignment is in [docs/findings-sum
 
 For a guided code walkthrough, see [docs/codebase-guide.md](docs/codebase-guide.md).
 
+## CI/CD And Deployment
+
+This repository now includes a monorepo-friendly CI/CD baseline:
+
+- GitHub Actions runs backend lint + tests and frontend lint + production build on every push and pull request.
+- Render can deploy the backend stack from [render.yaml](render.yaml).
+- Vercel can deploy the frontend from the `frontend` directory.
+
+This free-tier combination is appropriate for demos, previews, and staging. It should not be presented as a true production plan for a commercial client deployment.
+
+### What The Free-Tier Setup Covers
+
+- frontend previews and production-style deploys through Vercel
+- backend API through a Render free web service
+- PostgreSQL through Render free Postgres
+- Redis-compatible queue backend through Render free Key Value
+
+### Important Constraint
+
+The free Render blueprint intentionally omits the always-on Celery worker and Celery beat scheduler. The application remains usable, but background crawls should be triggered from the admin screen with **Run immediately** enabled so the web process executes the crawl inline.
+
+If you need always-on async job processing or scheduled crawls in production, add a paid Render background worker and a paid cron job (or move scheduled execution to another paid scheduler).
+
+### GitHub Actions
+
+The CI workflow lives at [.github/workflows/ci.yml](.github/workflows/ci.yml). It currently does the following:
+
+- backend lint with `ruff`
+- backend tests with `pytest`
+- frontend lint with Next.js ESLint rules
+- frontend production build with `next build`
+
+### Render Setup
+
+1. Push this repository to GitHub.
+2. In Render, create a new Blueprint and point it at this repository.
+3. Render will read [render.yaml](render.yaml) and provision:
+   - `stock-market-api`
+   - `stock-market-db`
+   - `stock-market-redis`
+4. Provide values for the prompted secrets:
+   - `BACKEND_CORS_ORIGINS`
+   - `BOOTSTRAP_ADMIN_EMAIL`
+   - `BOOTSTRAP_ADMIN_PASSWORD`
+5. Optional:
+   - If you want Gemini categorization, add `GEMINI_API_KEY` manually in the Render dashboard and switch `CATEGORIZATION_PROVIDER` from `rule_based` to `gemini`.
+
+The backend also accepts `BACKEND_CORS_ORIGIN_REGEX`, which is useful for Vercel preview URLs. The supplied Render blueprint already allows `https://*.vercel.app` style preview origins with a tighter subdomain regex.
+
+### Vercel Setup
+
+1. In Vercel, import the same GitHub repository.
+2. Set the project Root Directory to `frontend`.
+3. Add the environment variable:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=https://<your-render-service>.onrender.com/api
+```
+
+4. Trigger a deploy.
+
+For local development, `.env` can continue using `http://localhost:8000/api`.
+
 ## API Surface
 
 Implemented primary endpoints include:

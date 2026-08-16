@@ -20,16 +20,16 @@ class User(Base, TimestampMixin):
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="RESTRICT"), nullable=False)
 
-    role: Mapped["Role"] = relationship(back_populates="users")
-    triggered_crawl_runs: Mapped[list["CrawlRun"]] = relationship(back_populates="triggered_by")
-    created_news_tags: Mapped[list["NewsCompanyTag"]] = relationship(back_populates="created_by")
-    news_tag_corrections: Mapped[list["NewsTagCorrection"]] = relationship(back_populates="reviewer")
-    created_companies: Mapped[list["Company"]] = relationship(back_populates="created_by")
-    watchlist_entries: Mapped[list["UserWatchlistEntry"]] = relationship(
+    role: Mapped[Role] = relationship(back_populates="users")
+    triggered_crawl_runs: Mapped[list[CrawlRun]] = relationship(back_populates="triggered_by")
+    created_news_tags: Mapped[list[NewsCompanyTag]] = relationship(back_populates="created_by")
+    news_tag_corrections: Mapped[list[NewsTagCorrection]] = relationship(back_populates="reviewer")
+    created_companies: Mapped[list[Company]] = relationship(back_populates="created_by")
+    watchlist_entries: Mapped[list[UserWatchlistEntry]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    behavior_events: Mapped[list["UserBehaviorEvent"]] = relationship(
+    behavior_events: Mapped[list[UserBehaviorEvent]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )

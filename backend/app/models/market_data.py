@@ -29,7 +29,7 @@ class DailyPrice(Base, TimestampMixin):
     turnover: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     source_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
-    company: Mapped["Company"] = relationship(back_populates="price_history")
+    company: Mapped[Company] = relationship(back_populates="price_history")
 
 
 class FloorsheetTransaction(Base, TimestampMixin):
@@ -51,4 +51,4 @@ class FloorsheetTransaction(Base, TimestampMixin):
     row_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     source_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
-    company: Mapped["Company"] = relationship(back_populates="floorsheet_transactions")
+    company: Mapped[Company] = relationship(back_populates="floorsheet_transactions")

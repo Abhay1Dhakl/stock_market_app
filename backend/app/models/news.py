@@ -32,16 +32,16 @@ class NewsArticle(Base, TimestampMixin):
         nullable=True,
     )
 
-    crawl_run: Mapped[Optional["CrawlRun"]] = relationship(back_populates="articles")
-    tags: Mapped[list["NewsCompanyTag"]] = relationship(
+    crawl_run: Mapped[Optional[CrawlRun]] = relationship(back_populates="articles")
+    tags: Mapped[list[NewsCompanyTag]] = relationship(
         back_populates="news_article",
         cascade="all, delete-orphan",
     )
-    tag_corrections: Mapped[list["NewsTagCorrection"]] = relationship(
+    tag_corrections: Mapped[list[NewsTagCorrection]] = relationship(
         back_populates="news_article",
         cascade="all, delete-orphan",
     )
-    behavior_events: Mapped[list["UserBehaviorEvent"]] = relationship(back_populates="article")
+    behavior_events: Mapped[list[UserBehaviorEvent]] = relationship(back_populates="article")
 
 
 class NewsCompanyTag(Base, TimestampMixin):
@@ -77,9 +77,9 @@ class NewsCompanyTag(Base, TimestampMixin):
         nullable=True,
     )
 
-    news_article: Mapped["NewsArticle"] = relationship(back_populates="tags")
-    company: Mapped["Company"] = relationship(back_populates="news_tags")
-    created_by: Mapped[Optional["User"]] = relationship(back_populates="created_news_tags")
+    news_article: Mapped[NewsArticle] = relationship(back_populates="tags")
+    company: Mapped[Company] = relationship(back_populates="news_tags")
+    created_by: Mapped[Optional[User]] = relationship(back_populates="created_news_tags")
 
 
 class NewsTagCorrection(Base):
@@ -104,5 +104,5 @@ class NewsTagCorrection(Base):
         nullable=False,
     )
 
-    news_article: Mapped["NewsArticle"] = relationship(back_populates="tag_corrections")
-    reviewer: Mapped["User"] = relationship(back_populates="news_tag_corrections")
+    news_article: Mapped[NewsArticle] = relationship(back_populates="tag_corrections")
+    reviewer: Mapped[User] = relationship(back_populates="news_tag_corrections")
