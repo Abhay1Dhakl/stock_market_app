@@ -26,13 +26,13 @@ class WatchlistEntityMatcher:
     def __init__(self, companies: list[Company]) -> None:
         self._companies = []
         for company in companies:
-            symbol = normalize_text(company.symbol)
-            aliases = [
+            symbol = company.symbol.strip().upper()
+            alias_terms = [
                 normalize_text(term)
-                for term in build_company_terms(company.symbol, [company.name, *company.aliases])
+                for term in [company.name, *company.aliases]
                 if normalize_text(term)
             ]
-            unique_terms = list(dict.fromkeys(aliases))
+            unique_terms = [term for term in dict.fromkeys(alias_terms) if term != normalize_text(symbol)]
             self._companies.append(
                 {
                     "company_id": company.id,
@@ -54,6 +54,13 @@ class WatchlistEntityMatcher:
             symbol_hits = 0
             title_hits = 0
 
+            symbol_matches_title = _count_symbol_occurrences(title, company["symbol_term"])
+            symbol_matches_body = _count_symbol_occurrences(body, company["symbol_term"])
+            symbol_hits = symbol_matches_title + symbol_matches_body
+            if symbol_hits:
+                matched_terms.append(company["symbol_term"])
+                title_hits += symbol_matches_title
+
             for term in company["terms"]:
                 term_matches_title = _count_term_occurrences(normalized_title, term)
                 term_matches_body = _count_term_occurrences(normalized_body, term)
@@ -63,10 +70,7 @@ class WatchlistEntityMatcher:
 
                 matched_terms.append(term)
                 title_hits += term_matches_title
-                if term == company["symbol_term"]:
-                    symbol_hits += total_hits
-                else:
-                    alias_hits += total_hits
+                alias_hits += total_hits
 
             if not matched_terms:
                 continue
@@ -95,8 +99,21 @@ class WatchlistEntityMatcher:
                 )
             )
 
-        matches.sort(key=lambda item: (-item.confidence_score, item.company_symbol))
-        return matches
+        matches.sort(
+            key=lambda item: (
+                -item.confidence_score,
+                -max((len(term) for term in item.matched_terms), default=0),
+                item.company_symbol,
+            )
+        )
+
+        selected_matches: list[EntityMatch] = []
+        for match in matches:
+            if _is_shadowed_match(match, selected_matches):
+                continue
+            selected_matches.append(match)
+
+        return selected_matches
 
 
 def build_company_terms(symbol: str, aliases: Iterable[str]) -> list[str]:
@@ -106,3 +123,23 @@ def build_company_terms(symbol: str, aliases: Iterable[str]) -> list[str]:
 def _count_term_occurrences(text: str, term: str) -> int:
     pattern = re.compile(rf"(?<!\w){re.escape(term)}(?!\w)")
     return len(pattern.findall(text))
+
+
+def _count_symbol_occurrences(text: str, symbol: str) -> int:
+    pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(symbol)}(?![A-Za-z0-9])")
+    return len(pattern.findall(text))
+
+
+def _is_shadowed_match(candidate: EntityMatch, selected_matches: list[EntityMatch]) -> bool:
+    candidate_terms = [normalize_text(term) for term in candidate.matched_terms if normalize_text(term)]
+    if not candidate_terms:
+        return False
+
+    for selected in selected_matches:
+        selected_terms = [normalize_text(term) for term in selected.matched_terms if normalize_text(term)]
+        if selected.company_symbol == candidate.company_symbol or not selected_terms:
+            continue
+        if all(any(term in selected_term for selected_term in selected_terms) for term in candidate_terms):
+            return True
+
+    return False

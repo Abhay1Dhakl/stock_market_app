@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -43,11 +45,23 @@ class FloorsheetTrade:
     source_name: str = "sharesansar"
 
 
+@dataclass
+class ListedCompanyRecord:
+    symbol: str
+    name: str
+
+
 class MarketDataCrawler(HTTPCrawlerSupport):
     source_name = "sharesansar"
     company_url_template = "https://www.sharesansar.com/company/{symbol}"
+    company_directory_url = "https://www.sharesansar.com/company-list"
     price_history_endpoint = "https://www.sharesansar.com/company-price-history"
     floorsheet_endpoint = "https://www.sharesansar.com/company-floor-sheet"
+
+    def fetch_company_directory(self) -> list[ListedCompanyRecord]:
+        """Fetch the directory of listed companies exposed by ShareSansar."""
+        html = self._get_text(self.company_directory_url)
+        return self.parse_company_directory_payload(html)
 
     def fetch_company_history(self, symbol: str, days: int = 30) -> list[DailyTradingBar]:
         """Fetch recent daily OHLCV history for one company symbol.
@@ -151,6 +165,37 @@ class MarketDataCrawler(HTTPCrawlerSupport):
         bars.reverse()
         return bars
 
+    def parse_company_directory_payload(self, html: str) -> list[ListedCompanyRecord]:
+        """Extract listed company metadata from the ShareSansar company list page."""
+        match = re.search(r"var\s+cmpjson\s*=\s*(\[[\s\S]*?\]);", html)
+        if match is None:
+            return []
+
+        payload = json.loads(match.group(1))
+        if not isinstance(payload, list):
+            return []
+
+        companies: list[ListedCompanyRecord] = []
+        seen_symbols: set[str] = set()
+
+        for row in payload:
+            if not isinstance(row, dict):
+                continue
+
+            symbol = str(row.get("symbol", "")).strip().upper()
+            name = str(row.get("companyname", "")).strip()
+            if not symbol or not name or symbol in seen_symbols:
+                continue
+            if len(symbol) > 25 or len(name) > 255:
+                continue
+            if not _looks_like_tradeable_company(symbol, name):
+                continue
+
+            seen_symbols.add(symbol)
+            companies.append(ListedCompanyRecord(symbol=symbol, name=name))
+
+        return companies
+
     def parse_floorsheet_payload(self, payload: dict[str, object]) -> list[FloorsheetTrade]:
         """Parse the ShareSansar floorsheet payload into trade objects.
 
@@ -210,3 +255,36 @@ class MarketDataCrawler(HTTPCrawlerSupport):
                 "Referer": url,
             },
         }
+
+
+def _looks_like_tradeable_company(symbol: str, name: str) -> bool:
+    normalized_name = name.strip().lower()
+    normalized_symbol = symbol.strip().lower()
+    excluded_name_markers = (
+        "debenture",
+        "bond",
+        "rinpatra",
+        "fund management",
+        "ministry",
+        "department",
+        "stock exchange",
+        "exchange limited",
+        "merchant bankers",
+        "merchant banker",
+        "securities limited",
+        "securities ltd",
+        "capital limited",
+        "capital ltd",
+        "advisors limited",
+        "advisory",
+        "promoter share",
+    )
+    excluded_symbol_prefixes = ("8", "9", "10")
+
+    if any(marker in normalized_name for marker in excluded_name_markers):
+        return False
+    if any(normalized_symbol.startswith(prefix) for prefix in excluded_symbol_prefixes) and any(
+        marker in normalized_name for marker in ("debenture", "bond")
+    ):
+        return False
+    return True

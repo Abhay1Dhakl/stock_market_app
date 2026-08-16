@@ -74,7 +74,7 @@ export default function DashboardPage() {
         apiRequest<UserBehaviorSummaryResponse>("/users/me/behavior-summary", {
           token: activeSession.access_token,
         }),
-        apiRequest<NewsListResponse>("/news?limit=6", {
+        apiRequest<NewsListResponse>("/news?limit=24", {
           token: activeSession.access_token,
         }),
       ]);
@@ -244,6 +244,8 @@ export default function DashboardPage() {
       }))
       .filter((item) => Number.isFinite(item.change))
       .sort((left, right) => Math.abs(right.change) - Math.abs(left.change))[0] ?? null;
+  const companyLinkedNews = newsItems.filter((article) => article.tags.length > 0).slice(0, 6);
+  const generalMarketNews = newsItems.filter((article) => article.tags.length === 0).slice(0, 6);
 
   return (
     <LayoutShell
@@ -522,12 +524,12 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid--two">
-            <SectionCard eyebrow="News Desk" title="Latest Market Headlines" aside={<span className="badge">{newsItems.length} stories</span>}>
-              {newsItems.length === 0 ? (
-                <p className="muted">No recent tagged news is available yet.</p>
+            <SectionCard eyebrow="News Desk" title="Company-Linked News" aside={<span className="badge">{companyLinkedNews.length} linked stories</span>}>
+              {companyLinkedNews.length === 0 ? (
+                <p className="muted">No company-linked stories are visible in the current news window yet.</p>
               ) : (
                 <div className="stack">
-                  {newsItems.map((article) => (
+                  {companyLinkedNews.map((article) => (
                     <article key={article.id} className="list-card">
                       <div className="list-card__meta">
                         <span>{article.source_name}</span>
@@ -536,40 +538,80 @@ export default function DashboardPage() {
                       <a href={article.source_url} rel="noreferrer" target="_blank">
                         <strong>{article.headline}</strong>
                       </a>
+                      <div className="tag-row">
+                        {article.tags.slice(0, 3).map((tag) => (
+                          <Link key={`${article.id}-${tag.company_id}`} className="badge badge--success" href={`/companies/${tag.company_id}`}>
+                            {tag.symbol}
+                          </Link>
+                        ))}
+                      </div>
                       <p>{article.excerpt ?? "No summary is available for this story."}</p>
+                      <p className="muted">{`Matched to ${article.tags.map((tag) => tag.symbol).join(", ")} for company analysis.`}</p>
                     </article>
                   ))}
                 </div>
               )}
             </SectionCard>
 
-            <SectionCard eyebrow="Pulse" title="Desk Snapshot">
-              <div className="detail-grid">
-                <div className="stat-row">
-                  <span>Focus Name</span>
-                  <strong>{focusCompany?.company.symbol ?? "None"}</strong>
+            <SectionCard eyebrow="Market Wide" title="General Market News" aside={<span className="badge">{generalMarketNews.length} broad stories</span>}>
+              {generalMarketNews.length === 0 ? (
+                <p className="muted">No market-wide or uncategorized stories are visible in the current news window.</p>
+              ) : (
+                <div className="stack">
+                  {generalMarketNews.map((article) => (
+                    <article key={article.id} className="list-card">
+                      <div className="list-card__meta">
+                        <span>{article.source_name}</span>
+                        <span>{formatShortDate(article.published_at)}</span>
+                      </div>
+                      <a href={article.source_url} rel="noreferrer" target="_blank">
+                        <strong>{article.headline}</strong>
+                      </a>
+                      <div className="tag-row">
+                        <span className="badge badge--pending">General Market News</span>
+                      </div>
+                      <p>{article.excerpt ?? "No summary is available for this story."}</p>
+                      <p className="muted">This story is stored, but it is not linked to a single company analysis page.</p>
+                    </article>
+                  ))}
                 </div>
-                <div className="stat-row">
-                  <span>Largest Move</span>
-                  <strong>
-                    {strongestMove ? `${strongestMove.change > 0 ? "+" : ""}${strongestMove.change.toFixed(2)}%` : "N/A"}
-                  </strong>
-                </div>
-                <div className="stat-row">
-                  <span>Behavior Last Seen</span>
-                  <strong>{behavior?.last_activity_at ? formatShortDate(behavior.last_activity_at) : "N/A"}</strong>
-                </div>
-                <div className="stat-row">
-                  <span>Review Backlog</span>
-                  <strong>{reviewQueueCount ?? "Viewer"}</strong>
-                </div>
-              </div>
-              <p className="muted">
-                Use this desk as the operating layer: build a personal coverage set, react to companies surfacing in the
-                news, and keep the review loop clean.
-              </p>
+              )}
             </SectionCard>
           </div>
+
+          <SectionCard eyebrow="Pulse" title="Desk Snapshot">
+            <div className="detail-grid">
+              <div className="stat-row">
+                <span>Focus Name</span>
+                <strong>{focusCompany?.company.symbol ?? "None"}</strong>
+              </div>
+              <div className="stat-row">
+                <span>Largest Move</span>
+                <strong>
+                  {strongestMove ? `${strongestMove.change > 0 ? "+" : ""}${strongestMove.change.toFixed(2)}%` : "N/A"}
+                </strong>
+              </div>
+              <div className="stat-row">
+                <span>Behavior Last Seen</span>
+                <strong>{behavior?.last_activity_at ? formatShortDate(behavior.last_activity_at) : "N/A"}</strong>
+              </div>
+              <div className="stat-row">
+                <span>Review Backlog</span>
+                <strong>{reviewQueueCount ?? "Viewer"}</strong>
+              </div>
+              <div className="stat-row">
+                <span>Company-Linked News</span>
+                <strong>{companyLinkedNews.length}</strong>
+              </div>
+              <div className="stat-row">
+                <span>General Stories</span>
+                <strong>{generalMarketNews.length}</strong>
+              </div>
+            </div>
+            <p className="muted">
+              Company-linked stories feed stock analysis pages. Market-wide stories stay visible here without being forced into a wrong company match.
+            </p>
+          </SectionCard>
         </>
       )}
     </LayoutShell>

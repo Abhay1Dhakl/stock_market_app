@@ -129,3 +129,43 @@ def test_categorization_falls_back_to_rule_matcher_when_gemini_fails(db_session,
     assert summary["tagged"] == 1
     assert summary["fallback_articles"] == 1
     assert [tag.company.symbol for tag in tags] == ["NABIL"]
+
+
+def test_categorization_promotes_directory_company_after_news_match(db_session):
+    hidden_company = Company(
+        symbol="HDL",
+        name="Himalayan Distillery Limited",
+        sector="Manufacturing And Processing",
+        aliases=["Himalayan Distillery"],
+        description="Hidden directory company",
+        is_active=False,
+        source_kind="directory",
+    )
+    article = NewsArticle(
+        source_name="sharesansar",
+        source_url="https://example.com/hdl-q4-growth",
+        headline="Himalayan Distillery Reports 28.14% Profit Growth",
+        excerpt="Quarterly result",
+        body_text="Himalayan Distillery Limited reported stronger quarterly earnings and higher EPS.",
+        raw_payload={},
+    )
+    db_session.add_all([hidden_company, article])
+    db_session.commit()
+    db_session.refresh(hidden_company)
+    db_session.refresh(article)
+
+    summary = categorize_news_articles(db_session, article_ids=[article.id], only_missing=False)
+    refreshed_company = db_session.scalar(select(Company).where(Company.id == hidden_company.id))
+    tags = list(
+        db_session.scalars(
+            select(NewsCompanyTag)
+            .where(NewsCompanyTag.news_article_id == article.id)
+            .order_by(NewsCompanyTag.company_id.asc())
+        ).all()
+    )
+
+    assert summary["promoted_companies"] == 1
+    assert hidden_company.id in summary["promoted_company_ids"]
+    assert refreshed_company is not None
+    assert refreshed_company.is_active is True
+    assert [tag.company.symbol for tag in tags] == ["HDL"]

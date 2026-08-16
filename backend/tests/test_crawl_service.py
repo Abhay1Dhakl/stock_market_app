@@ -4,14 +4,16 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.crawlers.base import CrawledArticle
-from app.crawlers.market_data import DailyTradingBar, FloorsheetTrade
+from app.crawlers.market_data import DailyTradingBar, FloorsheetTrade, ListedCompanyRecord, MarketDataCrawler
 from app.models import Company, FloorsheetTransaction, NewsArticle
 from app.models.crawl_run import CrawlRun
 from app.services.crawl_service import (
     build_floorsheet_row_hash,
     ensure_seed_companies,
+    refresh_companies_market_data,
     ingest_news_articles,
     insert_floorsheet_rows,
+    sync_company_directory,
     upsert_daily_prices,
 )
 
@@ -110,3 +112,88 @@ def test_market_data_helpers_upsert_prices_and_skip_duplicate_floorsheet_rows(db
     assert second_insert_count == 0
     assert len(stored_floorsheet_rows) == 1
     assert stored_floorsheet_rows[0].row_hash == build_floorsheet_row_hash(company.symbol, trades[0])
+
+
+def test_sync_company_directory_creates_imported_companies(db_session, seeded_company_data, monkeypatch):
+    monkeypatch.setattr(
+        MarketDataCrawler,
+        "fetch_company_directory",
+        lambda self: [
+            ListedCompanyRecord(symbol="HDL", name="Himalayan Distillery Limited"),
+            ListedCompanyRecord(symbol="NABIL", name="Nabil Bank Limited"),
+        ],
+    )
+
+    summary = sync_company_directory(db_session)
+    imported_company = db_session.scalar(select(Company).where(Company.symbol == "HDL"))
+    existing_company = db_session.scalar(select(Company).where(Company.symbol == "NABIL"))
+
+    assert summary["created"] == 1
+    assert summary["directory_total"] == 2
+    assert imported_company is not None
+    assert imported_company.is_active is False
+    assert imported_company.source_kind == "directory"
+    assert imported_company.sector == "Manufacturing And Processing"
+    assert "Himalayan Distillery" in imported_company.aliases
+    assert existing_company is not None
+    assert existing_company.name == "Nabil Bank Limited"
+    assert summary["deactivated"] == 0
+
+
+def test_sync_company_directory_deactivates_stale_directory_companies(db_session, monkeypatch):
+    stale_company = Company(
+        symbol="MINFNC",
+        name="Ministry Of Finance Limited",
+        sector="Unclassified",
+        aliases=["Ministry Of Finance"],
+        description="Stale imported company",
+        is_active=True,
+        source_kind="directory",
+    )
+    db_session.add(stale_company)
+    db_session.commit()
+
+    monkeypatch.setattr(
+        MarketDataCrawler,
+        "fetch_company_directory",
+        lambda self: [ListedCompanyRecord(symbol="HDL", name="Himalayan Distillery Limited")],
+    )
+
+    summary = sync_company_directory(db_session)
+    refreshed_stale_company = db_session.scalar(select(Company).where(Company.symbol == "MINFNC"))
+
+    assert summary["deactivated"] == 1
+    assert refreshed_stale_company is not None
+    assert refreshed_stale_company.is_active is False
+
+
+def test_refresh_market_data_skips_directory_only_companies_on_bulk_runs(db_session, monkeypatch):
+    seeded_company = Company(
+        symbol="NABIL",
+        name="Nabil Bank Limited",
+        sector="Commercial Banks",
+        aliases=["Nabil Bank"],
+        description="Seed-like company",
+        is_active=True,
+        source_kind="seed",
+    )
+    directory_company = Company(
+        symbol="HDL",
+        name="Himalayan Distillery Limited",
+        sector="Manufacturing And Processing",
+        aliases=["Himalayan Distillery"],
+        description="Imported directory company",
+        is_active=False,
+        source_kind="directory",
+    )
+    db_session.add_all([seeded_company, directory_company])
+    db_session.commit()
+
+    monkeypatch.setattr(MarketDataCrawler, "fetch_company_history", lambda self, symbol, days=30: [])
+    monkeypatch.setattr(MarketDataCrawler, "fetch_company_floorsheet", lambda self, symbol, sample_days=1, page_size=200: [])
+
+    summary = refresh_companies_market_data(db_session)
+
+    assert summary["companies_total"] == 1
+    assert "NABIL" in summary["companies"]
+    assert "HDL" not in summary["companies"]

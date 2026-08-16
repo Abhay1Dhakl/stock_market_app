@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.categorization.entity_matcher import WatchlistEntityMatcher
@@ -33,7 +33,13 @@ def categorize_news_articles(
         dict[str, int]: Categorization counters including processed, tagged,
         review-candidate, and fallback totals.
     """
-    companies = list(db.scalars(select(Company).where(Company.is_active.is_(True)).order_by(Company.symbol.asc())).all())
+    companies = list(
+        db.scalars(
+            select(Company)
+            .where(or_(Company.is_active.is_(True), Company.source_kind == "directory"))
+            .order_by(Company.symbol.asc())
+        ).all()
+    )
     if not companies:
         return {
             "processed": 0,
@@ -42,6 +48,8 @@ def categorize_news_articles(
             "review_candidates": 0,
             "provider": "rule_based",
             "fallback_articles": 0,
+            "promoted_companies": 0,
+            "promoted_company_ids": [],
         }
 
     statement = select(NewsArticle).options(selectinload(NewsArticle.tags).selectinload(NewsCompanyTag.company))
@@ -56,6 +64,8 @@ def categorize_news_articles(
     manual_skipped = 0
     review_candidates = 0
     fallback_articles = 0
+    promoted_company_ids: set[int] = set()
+    company_lookup = {company.id: company for company in companies}
 
     try:
         for article in articles:
@@ -89,6 +99,12 @@ def categorize_news_articles(
 
             for match in matches:
                 confidence = Decimal(f"{match.confidence_score:.4f}")
+                company = company_lookup.get(match.company_id)
+                if company is not None and company.source_kind == "directory" and not company.is_active:
+                    company.is_active = True
+                    company.coverage_status = "pending"
+                    db.add(company)
+                    promoted_company_ids.add(company.id)
                 db.add(
                     NewsCompanyTag(
                         news_article_id=article.id,
@@ -121,6 +137,8 @@ def categorize_news_articles(
         "review_candidates": review_candidates,
         "provider": "gemini" if gemini_matcher is not None else "rule_based",
         "fallback_articles": fallback_articles,
+        "promoted_companies": len(promoted_company_ids),
+        "promoted_company_ids": sorted(promoted_company_ids),
     }
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
@@ -11,11 +12,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.crawlers.base import CrawledArticle
-from app.crawlers.market_data import DailyTradingBar, FloorsheetTrade, MarketDataCrawler
+from app.crawlers.market_data import DailyTradingBar, FloorsheetTrade, ListedCompanyRecord, MarketDataCrawler
 from app.crawlers.merolagani import MeroLaganiCrawler
 from app.crawlers.sharesansar import ShareSansarCrawler
-from app.models import Company, CrawlRun, DailyPrice, FloorsheetTransaction, NewsArticle
-from app.repositories.company_repository import list_active_companies
+from app.models import Company, CrawlRun, DailyPrice, FloorsheetTransaction, NewsArticle, NewsCompanyTag, UserWatchlistEntry
 from app.services.analysis_service import compute_analysis_snapshots
 from app.services.categorization_service import categorize_news_articles
 
@@ -25,6 +25,7 @@ KATHMANDU_TZ = ZoneInfo("Asia/Kathmandu")
 NEWS_LIMIT_PER_SOURCE = 10
 MARKET_HISTORY_DAYS = 30
 FLOORSHEET_SAMPLE_DAYS = 2
+DIRECTORY_SOURCE_KIND = "directory"
 
 NEWS_CRAWLER_REGISTRY = {
     "merolagani": MeroLaganiCrawler,
@@ -73,6 +74,17 @@ def execute_crawl_run(db: Session, crawl_run_id: int) -> CrawlRun:
     stats: dict[str, object] = {}
 
     try:
+        try:
+            stats["company_directory"] = sync_company_directory(db)
+        except Exception as exc:
+            logger.warning("Company directory sync failed: %s", exc)
+            stats["company_directory"] = {
+                "directory_total": 0,
+                "created": 0,
+                "updated": 0,
+                "error": str(exc),
+            }
+
         if crawl_run.run_kind in {"news", "full"}:
             stats["news"] = crawl_news_sources(db, crawl_run)
 
@@ -80,6 +92,9 @@ def execute_crawl_run(db: Session, crawl_run_id: int) -> CrawlRun:
             stats["market_data"] = crawl_market_dataset(db, crawl_run)
 
         stats["categorization"] = categorize_news_articles(db, only_missing=False)
+        promoted_company_ids = stats["categorization"].get("promoted_company_ids", [])
+        if promoted_company_ids:
+            stats["promotion_market_data"] = refresh_companies_market_data(db, company_ids=promoted_company_ids)
         stats["analysis"] = compute_analysis_snapshots(db)
 
         crawl_run = db.get(CrawlRun, crawl_run_id)
@@ -181,10 +196,10 @@ def refresh_companies_market_data(
     *,
     company_ids: list[int] | None = None,
 ) -> dict[str, object]:
-    companies = list_active_companies(db)
+    statement = select(Company).where(Company.is_active.is_(True))
     if company_ids:
-        target_ids = set(company_ids)
-        companies = [company for company in companies if company.id in target_ids]
+        statement = statement.where(Company.id.in_(company_ids))
+    companies = list(db.scalars(statement.order_by(Company.symbol.asc())).all())
 
     crawler = MarketDataCrawler()
     summary: dict[str, object] = {
@@ -242,6 +257,90 @@ def refresh_companies_market_data(
         crawler.close()
 
     return summary
+
+
+def sync_company_directory(db: Session) -> dict[str, int]:
+    """Import the broader listed-company directory used for news matching."""
+    crawler = MarketDataCrawler()
+    try:
+        directory_rows = crawler.fetch_company_directory()
+    finally:
+        crawler.close()
+
+    existing_companies = {
+        company.symbol.upper(): company
+        for company in db.scalars(select(Company)).all()
+    }
+    watched_company_ids = set(db.scalars(select(UserWatchlistEntry.company_id)).all())
+    tagged_company_ids = set(db.scalars(select(NewsCompanyTag.company_id).distinct()).all())
+    imported_symbols = {row.symbol for row in directory_rows}
+    created = 0
+    updated = 0
+    deactivated = 0
+
+    for row in directory_rows:
+        company = existing_companies.get(row.symbol)
+        inferred_sector = infer_sector_from_company_name(row.name)
+        generated_aliases = build_directory_aliases(row.name)
+
+        if company is None:
+            db.add(
+                Company(
+                    symbol=row.symbol,
+                    name=row.name,
+                    sector=inferred_sector,
+                    aliases=generated_aliases,
+                    description="Imported from the ShareSansar listed company directory for dynamic news matching.",
+                    is_active=False,
+                    source_kind=DIRECTORY_SOURCE_KIND,
+                    coverage_status="pending",
+                )
+            )
+            created += 1
+            continue
+
+        if company.source_kind != DIRECTORY_SOURCE_KIND:
+            continue
+
+        changed = False
+        if company.name != row.name:
+            company.name = row.name
+            changed = True
+        if company.sector == "Unclassified" and inferred_sector != "Unclassified":
+            company.sector = inferred_sector
+            changed = True
+        merged_aliases = merge_aliases(company.aliases, generated_aliases)
+        if merged_aliases != company.aliases:
+            company.aliases = merged_aliases
+            changed = True
+        if changed:
+            db.add(company)
+            updated += 1
+
+    for company in existing_companies.values():
+        if company.source_kind != DIRECTORY_SOURCE_KIND:
+            continue
+        if company.id in watched_company_ids or company.id in tagged_company_ids:
+            continue
+        if company.is_active and company.symbol.upper() not in imported_symbols:
+            company.is_active = False
+            db.add(company)
+            deactivated += 1
+            continue
+        if company.is_active and company.symbol.upper() in imported_symbols:
+            company.is_active = False
+            db.add(company)
+            deactivated += 1
+
+    if created or updated or deactivated:
+        db.commit()
+
+    return {
+        "directory_total": len(directory_rows),
+        "created": created,
+        "updated": updated,
+        "deactivated": deactivated,
+    }
 
 
 def ensure_seed_companies(db: Session) -> int:
@@ -468,3 +567,60 @@ def build_floorsheet_row_hash(symbol: str, trade: FloorsheetTrade) -> str:
         ]
     )
     return sha256(digest_source.encode("utf-8")).hexdigest()
+
+
+def infer_sector_from_company_name(name: str) -> str:
+    normalized = name.strip().lower()
+    sector_hints = [
+        ("microfinance", "Microfinance"),
+        ("laghubitta", "Microfinance"),
+        ("bikas bank", "Development Bank"),
+        ("bank", "Commercial Banks"),
+        ("hydropower", "Hydro Power"),
+        ("power company", "Hydro Power"),
+        ("insurance", "Insurance"),
+        ("distillery", "Manufacturing And Processing"),
+        ("cement", "Manufacturing And Processing"),
+        ("pharmaceutical", "Manufacturing And Processing"),
+        ("hotel", "Hotels And Tourism"),
+        ("resort", "Hotels And Tourism"),
+        ("finance", "Finance"),
+        ("investment", "Investment"),
+    ]
+    for marker, sector in sector_hints:
+        if marker in normalized:
+            return sector
+    return "Unclassified"
+
+
+def build_directory_aliases(name: str) -> list[str]:
+    aliases: list[str] = []
+    stripped_limited = re.sub(r"\s+(limited|ltd)\.?$", "", name, flags=re.IGNORECASE).strip()
+    if stripped_limited and stripped_limited != name and len(stripped_limited.split()) >= 2:
+        aliases.append(stripped_limited)
+
+    stripped_suffix = re.sub(
+        r"\s+(company|industries)\s*$",
+        "",
+        stripped_limited,
+        flags=re.IGNORECASE,
+    ).strip()
+    if stripped_suffix and stripped_suffix not in aliases and len(stripped_suffix.split()) >= 2:
+        aliases.append(stripped_suffix)
+
+    return aliases
+
+
+def merge_aliases(existing: list[str], generated: list[str]) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for value in [*existing, *generated]:
+        normalized = value.strip()
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(normalized)
+    return merged
